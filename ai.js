@@ -116,6 +116,9 @@
         return pool.length ? pool[0].id : null;
       },
 
+      /** Models that rejected the request to skip "thinking". Copying numbers needs no reasoning. */
+      noThinkingControl: {},
+
       generateJson: async function (opts) {
         var body = {
           contents: [{ role: 'user', parts: [{ text: opts.prompt }] }],
@@ -123,13 +126,24 @@
         };
         if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
         if (opts.providerSchema) body.generationConfig.responseSchema = opts.providerSchema;
+        // Gemini "thinking" models spend many seconds reasoning before they reply. Reading printed
+        // amounts needs none of it, so ask for no thinking, unless this model has refused that before.
+        var askedNoThinking = !this.noThinkingControl[opts.model];
+        if (askedNoThinking) body.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+
         var res = await fetch(this.base + '/' + opts.model + ':generateContent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.key },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
+          signal: opts.signal
         });
         var json = await res.json().catch(function () { return null; });
+        if (!res.ok && res.status === 400 && askedNoThinking && /thinking/i.test(JSON.stringify(json || ''))) {
+          this.noThinkingControl[opts.model] = true;      // this model must think; ask again without the setting
+          return this.generateJson(opts);
+        }
         if (!res.ok) throw httpError(res, json);
+        if (!json) throw new SyntaxError('Empty reply');
         var parts = (((json.candidates || [])[0] || {}).content || {}).parts || [];
         return parts.map(function (p) { return p.text || ''; }).join('');
       }
@@ -223,6 +237,8 @@
    * Returns { ok: true, data } or { ok: false, manual: true, reason }.
    * `prompt` is redacted here, so callers cannot forget to do it.
    */
+  var TIMEOUT_MS = 45000;
+
   async function callJson(opts) {
     var key = read(KEY_STORE);
     if (!key || status.state !== 'connected') {
@@ -235,19 +251,30 @@
     };
     var lastReason = '';
     for (var attempt = 1; attempt <= 2; attempt++) {
+      var started = Date.now();
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, TIMEOUT_MS);
+      request.signal = controller.signal;
+      var timedOut = false, rateLimited = false;
       try {
         var text = await provider.generateJson(request);
         var data = JSON.parse(text);
         var errors = validate(opts.schema, data);
         if (!errors.length) {
-          if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: status.model, attempt: attempt, result: 'pass', output: data });
+          clearTimeout(timer);
+          if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: status.model, attempt: attempt, seconds: (Date.now() - started) / 1000, result: 'pass', output: data });
           return { ok: true, data: data };
         }
         lastReason = 'Schema check failed: ' + errors.slice(0, 3).join('; ');
       } catch (err) {
-        lastReason = err instanceof SyntaxError ? 'Reply was not valid JSON' : explain(err);
+        timedOut = controller.signal.aborted;
+        rateLimited = err && err.status === 429;
+        lastReason = timedOut ? 'The AI took longer than ' + TIMEOUT_MS / 1000 + ' seconds'
+          : err instanceof SyntaxError ? 'Reply was not valid JSON' : explain(err);
       }
-      if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: status.model, attempt: attempt, result: 'fail', reason: lastReason });
+      clearTimeout(timer);
+      if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: status.model, attempt: attempt, seconds: (Date.now() - started) / 1000, result: 'fail', reason: lastReason });
+      if (timedOut || rateLimited) break;  // a second wait would only double the delay
     }
     return { ok: false, manual: true, reason: lastReason };
   }

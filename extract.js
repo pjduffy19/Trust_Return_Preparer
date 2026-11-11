@@ -395,7 +395,8 @@
         else { item.confidence = 'high'; item.reason = 'Two reads agree and the quote is on page ' + a.page; }
       } else if (p) {
         item.confidence = 'medium';
-        item.reason = !ai ? 'Read by the text parser only (no AI connected)' : !ai.ok ? 'Read by the text parser only (the AI read failed)' : 'Only the text parser found this';
+        item.reason = !ai ? 'Read by the text parser only (no AI connected)'
+          : !ai.ok ? 'Read by the text parser only (the AI read failed: ' + ai.reason.replace(/\.$/, '') + ')' : 'Only the text parser found this';
       } else if (a.quoteOk) {
         item.confidence = 'medium'; item.reason = 'Only the AI found this. Its quote is on page ' + a.page;
       } else {

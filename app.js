@@ -434,16 +434,37 @@
     var useAi = TRP.ai.getStatus().connected;
     var docs = [], itemIds = [];
 
-    for (var i = 0; i < files.length; i++) {
-      var file = files[i];
-      status.text = 'Reading ' + (i + 1) + ' of ' + files.length + ': ' + file.name + '…';
-      renderAll();
-      var res;
-      try { res = await TRP.extract.processFile(file, { useAi: useAi }); }
-      catch (err) {
-        res = { status: 'manual', reason: 'Something went wrong while reading this file', forms: [], typeLabel: 'Not read', pages: [], pdf: null, items: [],
-          events: [{ type: 'document.error', detail: { file: file.name, error: String(err && err.message || err) } }] };
+    // Read up to three files at once. Results are added in upload order once all are back.
+    var results = new Array(files.length), done = 0, next = 0, started = Date.now();
+    function showProgress() {
+      var secs = Math.round((Date.now() - started) / 1000);
+      status.text = 'Reading ' + plural(files.length, 'document') + (useAi ? ' with the AI' : '') + ': ' +
+        done + ' of ' + files.length + ' done' + (secs >= 3 ? ' (' + secs + ' s)' : '') + '…';
+      var node = $('#messages .status-line');
+      if (node) node.textContent = status.text; else renderAll();
+    }
+    var ticker = setInterval(showProgress, 1000);
+    showProgress();
+    renderAll();
+    async function worker() {
+      while (next < files.length) {
+        var i = next++, file = files[i];
+        try { results[i] = await TRP.extract.processFile(file, { useAi: useAi }); }
+        catch (err) {
+          results[i] = { status: 'manual', reason: 'Something went wrong while reading this file', forms: [], typeLabel: 'Not read', pages: [], pdf: null, items: [],
+            events: [{ type: 'document.error', detail: { file: file.name, error: String(err && err.message || err) } }] };
+        }
+        done++;
+        showProgress();
       }
+    }
+    var pool = [];
+    for (var w = 0; w < Math.min(3, files.length); w++) pool.push(worker());
+    await Promise.all(pool);
+    clearInterval(ticker);
+
+    files.forEach(function (file, i) {
+      var res = results[i];
       var doc = {
         id: 'd' + (++r.docSeq), name: file.name, size: file.size, file: file, status: res.status, reason: res.reason,
         typeLabel: res.typeLabel, forms: res.forms, pdf: res.pdf, pages: res.pages
@@ -454,7 +475,7 @@
       res.events.forEach(function (e) { log(e.type, e.detail, r); });
       itemIds = itemIds.concat(addItems(r, doc, res.items));
       log('document.result', { file: doc.name, status: doc.status, type: doc.typeLabel, reason: doc.reason || undefined, items: res.items.length }, r);
-    }
+    });
 
     r.messages.splice(r.messages.indexOf(statusMsg), 1);
     say(r, resultBlocks(r, docs, itemIds, useAi));
