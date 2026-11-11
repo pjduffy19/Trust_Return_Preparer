@@ -16,6 +16,7 @@
 
   /* ---------- pdf.js (pinned, loaded from the CDN on first use) ---------- */
 
+  var TAX_YEAR = 2025;
   var PDFJS_VERSION = '6.2.108';
   var PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@' + PDFJS_VERSION + '/legacy/build/';
   var pdfjsPromise = null;
@@ -107,6 +108,22 @@
     }
   };
 
+  // A prior-year Form 1041 (and its K-1s). Values here are cross-checked in the trust profile step.
+  FORMS.PRIOR = {
+    title: 'Prior-year Form 1041', short: 'Prior 1041', noManual: true,
+    fields: [
+      { id: 'prior_year', box: '', label: 'Tax year of the return', kind: 'text', use: 'prior', re: /(?:Tax|Calendar) year/i, valueRe: /\b20\d\d\b/ },
+      { id: 'prior_name', box: '', label: 'Name of trust', kind: 'text', use: 'prior', re: /Name of (?:estate or )?trust/i, source: 'i1041-name' },
+      { id: 'prior_ein', box: 'C', label: 'Employer identification number', kind: 'tin', use: 'prior', re: /Employer identification number/i, valueRe: /\b\d{2}-?\d{7}\b/, source: 'i1041-ein', noAi: true },
+      { id: 'prior_type', box: 'A', label: 'Type of entity', kind: 'choice', use: 'prior', source: 'f1041-item-a',
+        choices: { simple: 'Simple trust', complex: 'Complex trust' },
+        marks: { simple: /\[\s*[Xx✓✔]\s*\]\s*Simple trust/, complex: /\[\s*[Xx✓✔]\s*\]\s*Complex trust/ } },
+      field('prior_stcl', '', 'Short-term capital loss carryover', 'Short-term capital loss carryover', 'prior'),
+      field('prior_ltcl', '', 'Long-term capital loss carryover', 'Long-term capital loss carryover', 'prior'),
+      { id: 'prior_bens', box: '', label: 'Beneficiaries on the K-1s', kind: 'list', use: 'prior', re: /Beneficiary.s name/i, noAi: true }
+    ]
+  };
+
   var FIELD_INDEX = {};
   Object.keys(FORMS).forEach(function (formId) {
     FORMS[formId].id = formId;
@@ -175,8 +192,8 @@
     var text = pages.map(function (p) { return p.text; }).join('\n');
     var forms = ['1099-INT', '1099-DIV', '1099-B'].filter(function (id) { return FORMS[id].detect.test(text); });
     if (forms.length) return { kind: 'forms', forms: forms };
-    if (/Schedule K-1/i.test(text) && /1041/.test(text)) return { kind: 'prior', forms: [], label: 'Schedule K-1 (Form 1041)' };
-    if (/Form\s+1041\b/i.test(text) && /Income Tax Return for Estates and Trusts/i.test(text)) return { kind: 'prior', forms: [], label: 'Form 1041' };
+    if (/Form\s+1041\b/i.test(text) && /Income Tax Return for Estates and Trusts/i.test(text)) return { kind: 'forms', forms: ['PRIOR'] };
+    if (/Schedule K-1/i.test(text) && /1041/.test(text)) return { kind: 'forms', forms: ['PRIOR'] };
     if (/distribution/i.test(text) && /(expense|fees?)\b/i.test(text)) return { kind: 'forms', forms: ['SUMMARY'] };
     return { kind: 'unknown', forms: [] };
   }
@@ -246,27 +263,66 @@
     return null;
   }
 
-  function findTerm(pages) {
-    var longMark = /\[\s*[Xx✓✔]\s*\]\s*Long-term/, shortMark = /\[\s*[Xx✓✔]\s*\]\s*Short-term/;
-    var found = null;
+  var TERM_MARKS = { long: /\[\s*[Xx✓✔]\s*\]\s*Long-term/, short: /\[\s*[Xx✓✔]\s*\]\s*Short-term/ };
+
+  /** A ticked box printed as text, such as "[X] Long-term". Two different ticked values count as not found. */
+  function findMarked(marks, pages) {
+    var found = null, conflict = false;
     pages.forEach(function (pg) {
       pg.lines.forEach(function (line) {
-        var isLong = longMark.exec(line.text), isShort = shortMark.exec(line.text);
-        if (!isLong && !isShort) return;
-        if (isLong && isShort) { found = { conflict: true }; return; }
-        var m = isLong || isShort, value = isLong ? 'long' : 'short';
-        if (found && found.value !== value) { found = { conflict: true }; return; }
-        var it = itemAt(line, m.index);
-        found = { value: value, text: m[0], page: pg.num, rect: { x: it.x, y: line.y, w: it.w, h: it.h } };
+        Object.keys(marks).forEach(function (value) {
+          var m = marks[value].exec(line.text);
+          if (!m) return;
+          if (found && found.value !== value) { conflict = true; return; }
+          var it = itemAt(line, m.index);
+          found = { value: value, text: m[0], page: pg.num, rect: { x: it.x, y: line.y, w: it.w, h: it.h } };
+        });
       });
     });
-    return found && !found.conflict ? found : null;
+    return found && !conflict ? found : null;
+  }
+
+  /** Text printed after a label on the same line, or directly beneath it. Returns every match. */
+  function findTexts(f, pages) {
+    var out = [];
+    pages.forEach(function (pg) {
+      pg.lines.forEach(function (line, i) {
+        var m = f.re.exec(line.text);
+        if (!m) return;
+        var end = m.index + m[0].length;
+        var rest = line.text.slice(end).replace(/^[\s:.\-–—]+/, '').trim();
+        var src = line, it = itemAt(line, rest ? line.text.indexOf(rest, end) : end);
+        if (!rest && pg.lines[i + 1] && line.y - pg.lines[i + 1].y <= 30) {
+          src = pg.lines[i + 1];
+          var labelX = itemAt(line, m.index).x;
+          var under = src.items.filter(function (x) { return x.x >= labelX - 12; });
+          it = under[0];
+          rest = under.map(function (x) { return x.str; }).join(' ').trim();
+        }
+        if (f.valueRe) { var v = f.valueRe.exec(rest); rest = v ? v[0] : ''; }
+        if (rest && it) out.push({ value: rest, text: rest, page: pg.num, rect: { x: it.x, y: src.y, w: it.w, h: it.h } });
+      });
+    });
+    return out;
+  }
+
+  function findOther(f, pages) {
+    if (f.kind === 'term') return findMarked(TERM_MARKS, pages);
+    if (f.kind === 'choice') return findMarked(f.marks, pages);
+    var hits = findTexts(f, pages);
+    if (!hits.length) return null;
+    if (f.kind === 'list') {
+      var names = [];
+      hits.forEach(function (h) { if (names.indexOf(h.value) === -1) names.push(h.value); });
+      return { value: names, text: names.join(', '), page: hits[0].page, rect: hits[0].rect };
+    }
+    return hits[0];
   }
 
   function parseForm(formId, pages) {
     var form = FORMS[formId], out = {};
     form.fields.forEach(function (f) {
-      var hit = f.kind === 'term' ? findTerm(pages) : findAmount(f, form, pages);
+      var hit = f.kind === 'amount' ? findAmount(f, form, pages) : findOther(f, pages);
       if (hit) out[f.id] = hit;
     });
     return out;
@@ -277,7 +333,7 @@
   var AI_SCHEMA = {
     type: 'object', required: ['doc_type', 'fields'],
     properties: {
-      doc_type: { type: 'string', enum: ['1099-INT', '1099-DIV', '1099-B', 'SUMMARY', 'PRIOR-1041', 'UNKNOWN'] },
+      doc_type: { type: 'string', enum: ['1099-INT', '1099-DIV', '1099-B', 'SUMMARY', 'PRIOR', 'UNKNOWN'] },
       fields: {
         type: 'array',
         items: {
@@ -303,12 +359,15 @@
     var fieldList = [];
     ids.forEach(function (id) {
       FORMS[id].fields.forEach(function (f) {
+        if (f.noAi) return;
         fieldList.push(f.id + ': ' + FORMS[id].short + (f.box ? ' box ' + f.box : '') + ', ' + f.label +
-          (f.kind === 'term' ? ' (value must be "short" or "long", from the checked box)' : ''));
+          (f.kind === 'term' ? ' (value must be "short" or "long", from the checked box)'
+            : f.kind === 'choice' ? ' (value must be one of: ' + Object.keys(f.choices).join(', ') + ', from the checked box)'
+            : f.kind === 'text' ? ' (value is the text exactly as printed)' : ''));
       });
     });
     var prompt = [
-      'Document types: 1099-INT, 1099-DIV, 1099-B, SUMMARY (a trustee\'s distribution and expense summary), PRIOR-1041 (a prior-year Form 1041 or Schedule K-1), UNKNOWN.',
+      'Document types: 1099-INT, 1099-DIV, 1099-B, SUMMARY (a trustee\'s distribution and expense summary), PRIOR (a prior-year Form 1041 or Schedule K-1), UNKNOWN.',
       'Fields you may return, as id: meaning',
       fieldList.join('\n'),
       'Reply in this shape: {"doc_type":"1099-INT","fields":[{"id":"int_1","value":1234.56,"quote":"$ 1,234.56","page":1}]}',
@@ -323,17 +382,21 @@
     var fields = {};
     res.data.fields.forEach(function (row) {
       var f = FIELD_INDEX[row.id];
-      if (!f || fields[row.id]) return;                       // unknown or repeated ids are ignored
+      if (!f || f.noAi || fields[row.id]) return;             // unknown, repeated or never-asked ids are ignored
       var value = f.kind === 'term' ? (row.value === 'long' || row.value === 'short' ? row.value : null)
+        : f.kind === 'choice' ? (typeof row.value === 'string' && f.choices[row.value] ? row.value : null)
+        : f.kind === 'text' ? (typeof row.value === 'string' && row.value.trim() ? row.value.trim() : typeof row.value === 'number' ? String(row.value) : null)
         : (typeof row.value === 'number' && isFinite(row.value) ? row.value : null);
       if (value === null) return;
       var page = pages.filter(function (p) { return p.num === row.page; })[0];
       // The model saw redacted text, so the quote is checked against the same redacted text.
       var onPage = !!page && !!norm(row.quote) && norm(TRP.ai.redact(page.text)).indexOf(norm(row.quote)) !== -1;
       var carriesValue = f.kind === 'term' ? new RegExp(value + '-term', 'i').test(row.quote)
+        : f.kind === 'choice' ? norm(row.quote).indexOf(norm(f.choices[value])) !== -1
+        : f.kind === 'text' ? norm(row.quote).indexOf(norm(value)) !== -1
         : (row.quote.match(AMOUNT) || []).some(function (t) { return Math.abs(parseAmount(t) - value) < 0.005; });
       fields[row.id] = { value: value, quote: row.quote, page: row.page, quoteOk: onPage && carriesValue,
-        quoteProblem: !onPage ? 'the quote is not on page ' + row.page : !carriesValue ? 'the quote does not contain the amount' : '' };
+        quoteProblem: !onPage ? 'the quote is not on page ' + row.page : !carriesValue ? 'the quote does not contain the value' : '' };
     });
     return { ok: true, docType: res.data.doc_type, fields: fields };
   }
@@ -355,6 +418,9 @@
       atMost('div_5', 'div_1a', 'Section 199A dividends are more than ordinary dividends');
       ['div_2b', 'div_2c', 'div_2d'].forEach(function (id) { atMost(id, 'div_2a', FIELD_INDEX[id].label + ' is more than total capital gain distributions'); });
     }
+    if (formId === 'PRIOR' && v.prior_year && String(v.prior_year) !== String(TAX_YEAR - 1)) {
+      problems.push({ fields: ['prior_year'], message: 'This return is for ' + v.prior_year + ', not ' + (TAX_YEAR - 1) });
+    }
     if (formId === '1099-INT') atMost('int_9', 'int_8', 'Private activity bond interest is more than tax-exempt interest');
     if (formId === '1099-B' && has('b_gain') && has('b_1d') && has('b_1e')) {
       var expected = v.b_1d - v.b_1e + (has('b_1g') ? v.b_1g : 0);
@@ -373,7 +439,7 @@
     else if (RANK[level] === RANK[item.confidence] && level === 'low' && item.reason.indexOf(reason) === -1) item.reason += '; ' + reason;
   }
 
-  function same(f, a, b) { return f.kind === 'term' ? a === b : Math.abs(a - b) < 0.005; }
+  function same(f, a, b) { return f.kind === 'amount' ? Math.abs(a - b) < 0.005 : norm(a) === norm(b); }
 
   function reconcile(formId, parsed, ai) {
     var form = FORMS[formId], items = [], values = {};
@@ -418,6 +484,10 @@
   function show(f, value) {
     if (value === null || value === undefined) return 'not found';
     if (f.kind === 'term') return value === 'long' ? 'Long-term' : 'Short-term';
+    if (f.kind === 'choice') return f.choices[value] || String(value);
+    if (f.kind === 'tin') return TRP.ai.maskTin(value, 'ein');          // never shown in full
+    if (f.kind === 'list') return value.join(', ');
+    if (f.kind === 'text') return String(value);
     return formatMoney(value);
   }
 
@@ -459,7 +529,7 @@
 
     var cls = classify(doc.pages);
     var ai = null;
-    if (opts.useAi && cls.kind !== 'prior') {
+    if (opts.useAi) {
       ai = await aiRead(doc.pages, cls.forms);
       // The AI may propose a type for a document the rules could not place. Rules still read it.
       if (ai.ok && cls.kind === 'unknown' && FORMS[ai.docType]) {
@@ -470,11 +540,6 @@
     }
     out.events.push({ type: 'document.classified', detail: { file: file.name, by: cls.byAi ? 'AI proposal' : 'rules', result: cls.kind === 'forms' ? cls.forms.join(' + ') : cls.kind, aiSaid: ai && ai.ok ? ai.docType : undefined } });
 
-    if (cls.kind === 'prior') {
-      out.status = 'held'; out.typeLabel = 'Prior-year ' + cls.label;
-      out.reason = 'Held for the prior-year check in the trust profile step';
-      return out;
-    }
     if (cls.kind === 'unknown') { out.reason = 'Not a document type this tool reads'; return out; }
 
     out.status = 'read'; out.forms = cls.forms;
@@ -496,6 +561,7 @@
   TRP.extract = {
     ready: true,
     FORMS: FORMS,
+    TAX_YEAR: TAX_YEAR,
     field: function (id) { return FIELD_INDEX[id]; },
     isAccepted: isAccepted,
     loadPdfjs: loadPdfjs,
@@ -504,6 +570,7 @@
     show: show,
     parseAmount: parseAmount,
     // exposed for tests
+    norm: norm,
     _buildLines: buildLines, _classify: classify, _parseForm: parseForm, _reconcile: reconcile, _validate: validate
   };
 })();

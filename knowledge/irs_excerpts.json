@@ -1,25 +1,348 @@
 {
-  "_about": "Short excerpts copied from the IRS PDFs in /sources. These are the only texts the app may cite. Later milestones add excerpts from the Form 1041 instructions.",
-  "excerpts": [
-    { "id": "int-box1", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 1. Interest Income", "text": "Enter taxable interest not included in box 3." },
-    { "id": "int-box3", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 3. Interest on U.S. Savings Bonds and Treasury Obligations", "text": "Enter interest on U.S. Savings Bonds, Treasury bills, Treasury notes, and Treasury bonds. Do not include in box 1." },
-    { "id": "int-box4", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 4. Federal Income Tax Withheld", "text": "Enter backup withholding." },
-    { "id": "int-box6", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 6. Foreign Tax Paid", "text": "Enter any foreign tax paid on interest. Report this amount in U.S. dollars." },
-    { "id": "int-box8", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 8. Tax-Exempt Interest", "text": "Enter tax-exempt interest that is not OID of $10 or more that is credited or paid to the person's account […]" },
-    { "id": "int-box9", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 9. Specified Private Activity Bond Interest", "text": "Enter interest of $10 or more from specified private activity bonds." },
-
-    { "id": "div-box1a", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 1a. Total Ordinary Dividends", "text": "Enter dividends, including dividends from money market funds, net short-term capital gains from mutual funds, and other distributions on stock." },
-    { "id": "div-box1b", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 1b. Qualified Dividends", "text": "Enter the portion of the dividends in box 1a that qualifies for the reduced capital gains rates." },
-    { "id": "div-box2a", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 2a. Total Capital Gain Distr.", "text": "Enter total capital gain distributions (long-term). Include all amounts shown in boxes 2b, 2c, 2d, and 2f." },
-    { "id": "div-box4", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 4. Federal Income Tax Withheld", "text": "Enter backup withholding." },
-    { "id": "div-box5", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 5. Section 199A Dividends", "text": "Enter the qualified REIT dividends paid by a REIT or section 199A dividends paid by a RIC to the recipient. This amount is included in the amount reported in box 1a." },
-    { "id": "div-box7", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 7. Foreign Tax Paid", "text": "Enter foreign tax paid on dividends and other distributions on stock." },
-    { "id": "div-box12", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 12. Exempt-Interest Dividends", "text": "Enter exempt-interest dividends from a mutual fund or other RIC." },
-
-    { "id": "b-box1d", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 1d. Proceeds", "text": "Enter the gross cash proceeds from all dispositions (including short sales) of securities, commodities, options, securities futures contracts, or forward contracts." },
-    { "id": "b-box1e", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 1e. Cost or Other Basis", "text": "Enter the adjusted basis of any securities sold unless the security is not a covered security and you check box 5." },
-    { "id": "b-box1g", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 1g. Wash Sale Loss Disallowed", "text": "Report wash sale loss amount disallowed." },
-    { "id": "b-box2", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 2. Type of Gain or Loss", "text": "Determine whether the gain or loss is short-term or long-term under section 1222, and whether any portion of the gain or loss is ordinary." },
-    { "id": "b-box4", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 4. Federal Income Tax Withheld", "text": "Enter backup withholding." }
-  ]
+ "_about": "Short excerpts copied from the IRS PDFs in /sources. These are the only texts the app may cite. scripts/check_excerpts.py verifies that every excerpt appears in its source PDF.",
+ "excerpts": [
+  {
+   "id": "int-box1",
+   "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)",
+   "file": "sources/i1099int_rev2024.pdf",
+   "section": "Box 1. Interest Income",
+   "text": "Enter taxable interest not included in box 3."
+  },
+  {
+   "id": "int-box3",
+   "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)",
+   "file": "sources/i1099int_rev2024.pdf",
+   "section": "Box 3. Interest on U.S. Savings Bonds and Treasury Obligations",
+   "text": "Enter interest on U.S. Savings Bonds, Treasury bills, Treasury notes, and Treasury bonds. Do not include in box 1."
+  },
+  {
+   "id": "int-box4",
+   "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)",
+   "file": "sources/i1099int_rev2024.pdf",
+   "section": "Box 4. Federal Income Tax Withheld",
+   "text": "Enter backup withholding."
+  },
+  {
+   "id": "int-box6",
+   "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)",
+   "file": "sources/i1099int_rev2024.pdf",
+   "section": "Box 6. Foreign Tax Paid",
+   "text": "Enter any foreign tax paid on interest. Report this amount in U.S. dollars."
+  },
+  {
+   "id": "int-box8",
+   "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)",
+   "file": "sources/i1099int_rev2024.pdf",
+   "section": "Box 8. Tax-Exempt Interest",
+   "text": "Enter tax-exempt interest that is not OID of $10 or more that is credited or paid to the person's account […]"
+  },
+  {
+   "id": "int-box9",
+   "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)",
+   "file": "sources/i1099int_rev2024.pdf",
+   "section": "Box 9. Specified Private Activity Bond Interest",
+   "text": "Enter interest of $10 or more from specified private activity bonds."
+  },
+  {
+   "id": "div-box1a",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 1a. Total Ordinary Dividends",
+   "text": "Enter dividends, including dividends from money market funds, net short-term capital gains from mutual funds, and other distributions on stock."
+  },
+  {
+   "id": "div-box1b",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 1b. Qualified Dividends",
+   "text": "Enter the portion of the dividends in box 1a that qualifies for the reduced capital gains rates."
+  },
+  {
+   "id": "div-box2a",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 2a. Total Capital Gain Distr.",
+   "text": "Enter total capital gain distributions (long-term). Include all amounts shown in boxes 2b, 2c, 2d, and 2f."
+  },
+  {
+   "id": "div-box4",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 4. Federal Income Tax Withheld",
+   "text": "Enter backup withholding."
+  },
+  {
+   "id": "div-box5",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 5. Section 199A Dividends",
+   "text": "Enter the qualified REIT dividends paid by a REIT or section 199A dividends paid by a RIC to the recipient. This amount is included in the amount reported in box 1a."
+  },
+  {
+   "id": "div-box7",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 7. Foreign Tax Paid",
+   "text": "Enter foreign tax paid on dividends and other distributions on stock."
+  },
+  {
+   "id": "div-box12",
+   "source": "Instructions for Form 1099-DIV (Rev. January 2024)",
+   "file": "sources/i1099div_rev2024.pdf",
+   "section": "Box 12. Exempt-Interest Dividends",
+   "text": "Enter exempt-interest dividends from a mutual fund or other RIC."
+  },
+  {
+   "id": "b-box1d",
+   "source": "Instructions for Form 1099-B (2025)",
+   "file": "sources/i1099b_2025.pdf",
+   "section": "Box 1d. Proceeds",
+   "text": "Enter the gross cash proceeds from all dispositions (including short sales) of securities, commodities, options, securities futures contracts, or forward contracts."
+  },
+  {
+   "id": "b-box1e",
+   "source": "Instructions for Form 1099-B (2025)",
+   "file": "sources/i1099b_2025.pdf",
+   "section": "Box 1e. Cost or Other Basis",
+   "text": "Enter the adjusted basis of any securities sold unless the security is not a covered security and you check box 5."
+  },
+  {
+   "id": "b-box1g",
+   "source": "Instructions for Form 1099-B (2025)",
+   "file": "sources/i1099b_2025.pdf",
+   "section": "Box 1g. Wash Sale Loss Disallowed",
+   "text": "Report wash sale loss amount disallowed."
+  },
+  {
+   "id": "b-box2",
+   "source": "Instructions for Form 1099-B (2025)",
+   "file": "sources/i1099b_2025.pdf",
+   "section": "Box 2. Type of Gain or Loss",
+   "text": "Determine whether the gain or loss is short-term or long-term under section 1222, and whether any portion of the gain or loss is ordinary."
+  },
+  {
+   "id": "b-box4",
+   "source": "Instructions for Form 1099-B (2025)",
+   "file": "sources/i1099b_2025.pdf",
+   "section": "Box 4. Federal Income Tax Withheld",
+   "text": "Enter backup withholding."
+  },
+  {
+   "id": "f1041-item-a",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Item A, page 1",
+   "text": "Decedent’s estate · Simple trust · Complex trust · Qualified disability trust · ESBT (S portion only) · Grantor type trust · Bankruptcy estate—Ch. 7 · Bankruptcy estate—Ch. 11 · Pooled income fund"
+  },
+  {
+   "id": "f1041-item-f",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Item F, page 1",
+   "text": "Initial return · Final return · Amended return · Net operating loss carryback · Change in trust’s name · Change in fiduciary · Change in fiduciary’s name · Change in fiduciary’s address"
+  },
+  {
+   "id": "f1041-lines-3-5-6",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Lines 3, 5 and 6, page 1",
+   "text": "Business income or (loss). Attach Schedule C (Form 1040) · Rents, royalties, partnerships, other estates and trusts, etc. Attach Schedule E (Form 1040) · Farm income or (loss). Attach Schedule F (Form 1040)"
+  },
+  {
+   "id": "f1041-q2",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Other Information, question 2",
+   "text": "Did the estate or trust receive all or any part of the earnings (salary, wages, and other compensation) of any individual by reason of a contract assignment or similar arrangement?"
+  },
+  {
+   "id": "f1041-q11-12",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Other Information, questions 11a and 12",
+   "text": "Did the estate or trust distribute S corporation stock for which it made a section 965(i) election? · Did the estate or trust either make a section 965(i) election or enter into a transfer agreement as an eligible section 965(i) transferee for S corporation stock held on the last day of the tax year?"
+  },
+  {
+   "id": "f1041-q13",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Other Information, question 13",
+   "text": "sell, exchange, or otherwise dispose of a digital asset (or a financial interest in a digital asset)?"
+  },
+  {
+   "id": "i1041-simple-trust",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Simple Trust, page 18",
+   "text": "A trust may qualify as a simple trust if: 1. The trust instrument requires that all income must be distributed currently; 2. The trust instrument doesn’t provide that any amounts are to be paid, permanently set aside, or used for charitable purposes; and 3. The trust doesn’t distribute amounts allocated to the corpus of the trust."
+  },
+  {
+   "id": "i1041-complex-trust",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Complex Trust, page 19",
+   "text": "A complex trust is any trust that doesn’t qualify as a simple trust as explained above."
+  },
+  {
+   "id": "i1041-grantor",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Grantor Type Trust, page 19",
+   "text": "A grantor type trust is a legal trust under applicable state law that isn’t recognized as a separate taxable entity for income tax purposes because the grantor or other substantial owners have not relinquished complete dominion and control over the trust."
+  },
+  {
+   "id": "i1041-name",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Name of Estate or Trust, page 18",
+   "text": "Copy the exact name of the estate or trust from the Form SS-4, Application for Employer Identification Number, that you used to apply for the EIN."
+  },
+  {
+   "id": "i1041-fiduciary",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Name and Title of Fiduciary, page 18",
+   "text": "Enter the name and title of the fiduciary."
+  },
+  {
+   "id": "i1041-address",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Address, page 18",
+   "text": "Include the suite, room, or other unit number after the street address."
+  },
+  {
+   "id": "i1041-item-b",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "B. Number of Schedules K-1 Attached, page 19",
+   "text": "Every trust or decedent’s estate claiming an income distribution deduction on page 1, line 18, must enter the number of Schedules K-1 (Form 1041) that are attached to Form 1041."
+  },
+  {
+   "id": "i1041-ein",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "C. Employer Identification Number, page 19",
+   "text": "Every estate or trust that is required to file Form 1041 must have an EIN."
+  },
+  {
+   "id": "i1041-date-created",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "D. Date Entity Created, page 19",
+   "text": "Enter the date the trust was created or, if a decedent’s estate, the date of the decedent’s death."
+  },
+  {
+   "id": "i1041-amended",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Amended Return, page 20",
+   "text": "If you are filing an amended Form 1041: • Check the “Amended return” box in item F, • Complete the entire return, • Correct the appropriate lines with the new information, and • Refigure the estate’s or trust’s tax liability."
+  },
+  {
+   "id": "i1041-final-return",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Final Return, page 20",
+   "text": "Check this box if this is a final return because the estate or trust has terminated. Also, check the “Final K-1” box at the top of Schedule K-1."
+  },
+  {
+   "id": "i1041-change-name",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Change in Trust’s Name, page 20",
+   "text": "If the name of the trust has changed from the name shown on the prior year’s return (or Form SS-4 if this is the first return being filed), be sure to check this box."
+  },
+  {
+   "id": "i1041-change-fiduciary",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Change in Fiduciary, page 20",
+   "text": "If a different fiduciary enters their name on the line for “Name and title of fiduciary” than was shown on the prior year’s return (or Form SS-4 if this is the first return being filed) and you didn’t file a Form 8822-B, be sure to check this box."
+  },
+  {
+   "id": "i1041-line-12",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Line 12—Fiduciary Fees, page 26",
+   "text": "Enter the deductible fees paid or incurred to the fiduciary for administering the estate or trust during the tax year."
+  },
+  {
+   "id": "i1041-tax-exempt-allocation",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Allocation of Deductions for Tax-Exempt Income, page 23",
+   "text": "Generally, no deduction that would otherwise be allowable is allowed for any expense (whether for business or for the production of income) that is allocable to tax-exempt income. […] A reasonable proportion of expenses indirectly allocable to both tax-exempt income and other income must be allocated to each class of income."
+  },
+  {
+   "id": "i1041-accounting-income",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule B, Line 8—Accounting Income, page 32",
+   "text": "If you are filing for a complex trust, enter the income for the tax year determined under the terms of the governing instrument and applicable local law."
+  },
+  {
+   "id": "i1041-q1",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 1, page 38",
+   "text": "If the estate or trust received tax-exempt income, figure the allocation of expenses between tax-exempt and taxable income on a separate sheet and attach it to the return."
+  },
+  {
+   "id": "i1041-q3",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 3, page 39",
+   "text": "At any time during the year, the estate or trust had an interest in or signature or other authority over a bank, securities, or other financial account in a foreign country."
+  },
+  {
+   "id": "i1041-q4",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 4, page 39",
+   "text": "The estate or trust may be required to file Form 3520, Annual Return To Report Transactions With Foreign Trusts and Receipt of Certain Foreign Gifts"
+  },
+  {
+   "id": "i1041-q5",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 5, page 39",
+   "text": "An estate or trust claiming an interest deduction for qualified residence interest (as defined in section 163(h)(3)) on seller-provided financing must include on an attachment to the 2025 Form 1041 the name, address, and TIN of the person to whom the interest was paid or accrued (that is, the seller)."
+  },
+  {
+   "id": "i1041-q6",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 6, page 39",
+   "text": "To make the section 663(b) election to treat any amount paid or credited to a beneficiary within 65 days following the close of the tax year as being paid or credited on the last day of that tax year, check the box. This election can be made by the fiduciary of a complex trust or the executor of a decedent’s estate."
+  },
+  {
+   "id": "i1041-q7",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 7, page 39",
+   "text": "To make the section 643(e)(3) election to recognize gain on property distributed in kind, check the box and see the Instructions for Schedule D (Form 1041)."
+  },
+  {
+   "id": "i1041-q9",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 9, page 39",
+   "text": "Generally, a beneficiary is a skip person if the beneficiary is in a generation that is 2 or more generations below the generation of the transferor to the trust."
+  },
+  {
+   "id": "i1041-q10",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, Question 10, page 39",
+   "text": "A domestic trust that is a specified domestic entity must file Form 8938 along with Form 1041 for the tax year."
+  },
+  {
+   "id": "i1041-digital",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Other Information, digital assets, page 40",
+   "text": "You have a financial interest in a digital asset if you are the owner of record of a digital asset, or have an ownership stake in an account that holds one or more digital assets, including the rights and obligations to acquire a financial interest, or you own a wallet that holds digital assets."
+  }
+ ]
 }

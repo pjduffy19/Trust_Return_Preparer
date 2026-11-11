@@ -16,7 +16,7 @@ To use AI-assisted intake, paste your own Google Gemini API key on the first scr
 |---|---|---|
 | 1 | Repo skeleton, UI shell (light/dark), API key handling, session-only state | Built |
 | 2 | Document upload, two-method extraction, validations, confidence, source panel | Built |
-| 3 | Trust profile questions, simple/complex classification, out-of-scope refusal, prior-year flow | Not started |
+| 3 | Trust profile questions, simple/complex classification, out-of-scope refusal, prior-year flow | Built |
 | 4 | Rules engine, cited constants, test cases 1–4 | Not started |
 | 5 | Review gate, escalations, test cases 5–7 | Not started |
 | 6 | PDF field mapping and filling, review log export, reviewer sign-off | Not started |
@@ -33,6 +33,18 @@ Scans and images have no text layer and cannot be redacted, so they are never se
 
 Click any row to open the source page with the amount highlighted, then confirm or correct it.
 
+## The trust profile
+
+After the documents are read, the app asks what they cannot answer, one question at a time. Each card says why it is asked and cites an IRS excerpt, which opens when you click the source tag. This step uses no AI at all.
+
+- **Scope.** Estates, grantor trusts, ESBTs, qualified disability trusts, bankruptcy estates, pooled income funds, foreign trusts and trusts with business or rental income are refused with an explanation.
+- **Simple or complex.** Three questions apply the simple-trust test from the Form 1041 instructions. The rules propose the result and you confirm it. A trust that is simple on paper but distributed principal is complex for the year.
+- **Header and Other Information.** Name, EIN, date created, fiduciary, initial/final/amended, changes since last year, beneficiaries and shares, how gains and trustee fees are allocated, and the Other Information questions on page 3.
+- **Prior year.** A prior-year return is read like any other document and compared with your answers: EIN, name, classification, beneficiaries and capital loss carryovers. Differences become follow-up questions or Low items.
+- **Not sure** is always allowed. It becomes a Low item for the reviewer, never a guess. Elections and anything outside the rules are escalated.
+
+SSNs and EINs are typed into masked boxes, kept in memory for the final PDF only, and never logged or sent to the AI.
+
 ## Sample documents
 
 `samples/` holds synthetic PDFs, each stamped "SAMPLE - SYNTHETIC DATA". "Try the sample documents" on the first screen loads `samples/case1`. Regenerate them with `python scripts/make_samples.py` (needs `reportlab` and `pillow`).
@@ -40,6 +52,7 @@ Click any row to open the source page with the amount highlighted, then confirm 
 - `case1/` baseline simple trust: 1099-INT, 1099-DIV, 1099-B and the trustee's summary
 - `case4/` tax-exempt interest plus trustee fees
 - `case6/` a scan with no text layer (goes to manual entry)
+- `case7/` a prior-year return with a long-term capital loss carryover and two K-1s
 - `checks/` documents that trip the checks: qualified above ordinary dividends, foreign tax and Section 199A dividends, a short-term wash sale
 
 ## Known limitations so far
@@ -48,6 +61,8 @@ Click any row to open the source page with the amount highlighted, then confirm 
 - The short-term or long-term box is read only when it is printed as text, such as "[X] Long-term". If it is not found, the item is Low and you choose it.
 - Descriptions and dates on Form 1099-B are not captured.
 - Scans and photos are not read at all; their values are typed in by hand.
+- A prior-year return is read only when its values are in the page text, as in the sample. A return saved from the IRS fillable PDF keeps its values in form fields, which are not read yet; the app then asks for last year's classification and carryovers instead.
+- Beneficiary shares are not on a Schedule K-1, so only names are compared with last year.
 - On the source page, full SSNs and EINs found in the text layer are painted over, leaving the last 4 digits. Positions inside a run of text are estimated, so a mask can be a little wide or narrow. Scanned pages have no text layer, so they cannot be masked; the panel says so.
 
 ## Layout
@@ -58,6 +73,7 @@ styles.css            light and dark themes via CSS variables
 app.js                UI, chat flow, session state
 ai.js                 provider adapter, schema validation, SSN/EIN redaction
 extract.js            document reading: classify, parse, AI read, checks, confidence
+profile.js            trust profile questions, classification rule, scope and reviewer flags
 rules/engine.js       deterministic tax calculations (stub)
 rules/constants_2025.js   2025 constants, each cited to the instructions (stub)
 pdf/fill.js           fills the IRS PDFs (stub)
@@ -65,6 +81,7 @@ pdf/field_map_2025.json   return line -> PDF field name (stub)
 knowledge/irs_excerpts.json   the only text the app may cite
 samples/              synthetic test documents
 scripts/make_samples.py   regenerates the samples
+scripts/check_excerpts.py verifies every excerpt appears in its source PDF
 sources/              IRS PDFs
 tests/tests.html      rules-engine test runner (stub)
 ```

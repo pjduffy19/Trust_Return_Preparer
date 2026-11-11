@@ -134,6 +134,10 @@
       itemSeq: 0,
       acked: false,
       busy: false,
+      answers: {},          // trust profile answers: id -> { value, label, confidence, reason }
+      pii: {},              // full SSNs and EINs: memory only, never logged, never sent to the AI
+      profileStarted: false,
+      profileDone: false,
       counts: { high: 0, medium: 0, low: 0 },
       log: [],
       status: 'Simple or complex: pending your answers',
@@ -258,25 +262,374 @@
     if (!input.disabled) input.focus();
   }
 
-  function renderQuestion(r, q) {
-    var options = el('div', { class: 'question-options', role: 'group', 'aria-label': 'Answers' });
-    q.options.forEach(function (opt) {
-      options.appendChild(el('button', {
-        type: 'button', class: 'btn btn-outline',
-        disabled: q.answer != null,
-        'aria-pressed': q.answer === opt.value ? 'true' : null,
-        onclick: function () { answerQuestion(r, q, opt); }
-      }, opt.label));
-    });
-    return el('div', { class: 'question' },
-      el('span', { class: 'question-count' }, q.count),
-      el('p', { class: 'question-text' }, q.text),
-      options,
-      el('div', { class: 'question-meta' },
-        el('p', {}, el('strong', {}, "Why I'm asking: "), q.why),
-        el('span', { class: 'source-tag' }, 'Source: ' + q.source))
-    );
+  /* ---------- Question cards (the synthetic-data check and the trust profile) ---------- */
+
+  function sourceNode(q) {
+    var cite = q.sourceId ? TRP.knowledge.byId[q.sourceId] : null;
+    if (!q.pid) return el('span', { class: 'source-tag' }, 'Source: ' + q.source);
+    if (!cite) return el('span', { class: 'source-tag' }, q.sourceId ? 'Source: IRS excerpt not loaded' : 'Source: app boundary, not an IRS rule');
+    var wrap = el('div', { class: 'source-wrap' },
+      el('button', { type: 'button', class: 'source-tag source-btn', 'aria-expanded': q.showSource ? 'true' : 'false',
+        onclick: function () { q.showSource = !q.showSource; renderMessages(); } },
+        'Source: ' + cite.source + ' · ' + cite.section));
+    if (q.showSource) wrap.appendChild(el('blockquote', { class: 'excerpt' }, cite.text));
+    return wrap;
   }
+
+  /** An input whose typed value survives re-renders, by living in q.draft. */
+  function draftInput(q, key, attrs) {
+    attrs.class = 'input';
+    attrs.autocomplete = 'off';
+    if (q.draft[key] != null && attrs.type !== 'checkbox') attrs.value = q.draft[key];
+    var input = el('input', attrs);
+    if (attrs.type === 'checkbox') input.checked = !!q.draft[key];
+    input.addEventListener(attrs.type === 'checkbox' ? 'change' : 'input', function () {
+      q.draft[key] = attrs.type === 'checkbox' ? input.checked : input.value;
+    });
+    return input;
+  }
+
+  function labelled(text, input, cls) {
+    return el('label', { class: 'q-field' + (cls ? ' ' + cls : '') }, el('span', { class: 'q-label' }, text), input);
+  }
+
+  function nineDigits(text) {
+    var d = String(text || '').replace(/[\s-]/g, '');
+    return /^\d{9}$/.test(d) ? d : null;
+  }
+
+  /** Builds the answer form for one profile question. submit(value, label) records the answer. */
+  function answerForm(r, q, submit) {
+    var def = q.def, error = el('p', { class: 'form-error', role: 'alert' }, q.error || '');
+    function fail(msg, focusEl) { q.error = msg; error.textContent = msg; if (focusEl) focusEl.focus(); }
+    var body = [], onSave, extra = null;
+
+    if (def.type === 'text') {
+      var t = draftInput(q, 'v', { type: 'text', maxlength: '120', placeholder: def.hint || '', 'aria-label': q.text });
+      body.push(t);
+      onSave = function () {
+        var v = t.value.replace(/\s+/g, ' ').trim();
+        if (!v) return fail('Enter an answer.', t);
+        if (TRP.ai.findTins(v).length) return fail('Do not type an SSN or EIN here.', t);
+        submit(v, v);
+      };
+    } else if (def.type === 'date') {
+      var d = draftInput(q, 'v', { type: 'date', max: TRP.profile.YEAR + '-12-31', 'aria-label': q.text });
+      body.push(d);
+      onSave = function () {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d.value)) return fail('Choose a date.', d);
+        if (d.value > TRP.profile.YEAR + '-12-31') return fail('The date cannot be after ' + TRP.profile.YEAR + '.', d);
+        var p = d.value.split('-');
+        submit(d.value, p[1] + '/' + p[2] + '/' + p[0]);
+      };
+    } else if (def.type === 'tin') {
+      var n = draftInput(q, 'v', { type: 'password', inputmode: 'numeric', maxlength: '11', placeholder: '00-0000000', 'aria-label': q.text });
+      body.push(n, el('p', { class: 'fine' }, def.hint || ''));
+      onSave = function () {
+        var digits = nineDigits(n.value);
+        if (!digits) return fail('Enter nine digits.', n);
+        r.pii[def.id] = digits;
+        q.draft = {};
+        var masked = TRP.ai.maskTin(digits, def.kind);
+        submit(masked, masked);
+      };
+    } else if (def.type === 'address') {
+      var street = draftInput(q, 'street', { type: 'text', maxlength: '80' }), city = draftInput(q, 'city', { type: 'text', maxlength: '40' });
+      var st = draftInput(q, 'state', { type: 'text', maxlength: '2' }), zip = draftInput(q, 'zip', { type: 'text', inputmode: 'numeric', maxlength: '10' });
+      body.push(el('div', { class: 'q-grid' }, labelled('Number and street', street, 'wide'), labelled('City or town', city), labelled('State', st, 'narrow'), labelled('ZIP code', zip, 'narrow')));
+      onSave = function () {
+        var v = { street: street.value.trim(), city: city.value.trim(), state: st.value.trim().toUpperCase(), zip: zip.value.trim() };
+        if (!v.street) return fail('Enter the street address.', street);
+        if (!v.city) return fail('Enter the city or town.', city);
+        if (!/^[A-Z]{2}$/.test(v.state)) return fail('Enter the two-letter state.', st);
+        if (!/^\d{5}(-\d{4})?$/.test(v.zip)) return fail('Enter a 5-digit ZIP code.', zip);
+        submit(v, v.street + ', ' + v.city + ', ' + v.state + ' ' + v.zip);
+      };
+    } else if (def.type === 'multi') {
+      var boxes = q.options.map(function (o) {
+        var c = draftInput(q, 'c_' + o.value, { type: 'checkbox' });
+        c.className = '';
+        return { o: o, c: c, node: el('label', { class: 'q-check' }, c, el('span', {}, o.label)) };
+      });
+      body.push(el('div', { class: 'q-checks' }, boxes.map(function (b) { return b.node; }).reduce(function (wrap, node) { wrap.appendChild(node); return wrap; }, el('div', {}))));
+      extra = el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { submit([], def.noneLabel); } }, def.noneLabel);
+      onSave = function () {
+        var picked = boxes.filter(function (b) { return b.c.checked; });
+        if (!picked.length) return fail('Tick at least one, or choose "' + def.noneLabel + '".');
+        submit(picked.map(function (b) { return b.o.value; }), picked.map(function (b) { return b.o.label; }).join(', '));
+      };
+    } else if (def.type === 'amounts') {
+      var ins = def.fields.map(function (f) {
+        var i = draftInput(q, f.key, { type: 'text', inputmode: 'decimal', placeholder: '0.00' });
+        return { f: f, i: i };
+      });
+      body.push(el('div', { class: 'q-grid' }, ins.map(function (x) { return labelled(x.f.label, x.i); }).reduce(function (w, nd) { w.appendChild(nd); return w; }, el('div', { class: 'q-grid-inner' }))));
+      extra = el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { submit({ skipped: true }, def.skipLabel); } }, def.skipLabel);
+      onSave = function () {
+        var v = {}, bad = null;
+        ins.forEach(function (x) {
+          var raw = x.i.value.trim() === '' ? '0' : x.i.value, amt = readAmount(raw);
+          if (amt === null || amt < 0) bad = bad || x; else v[x.f.key] = amt;
+        });
+        if (bad) return fail('Enter an amount such as 3,000.00, or 0.', bad.i);
+        submit(v, ins.map(function (x) { return x.f.label + ' ' + TRP.extract.formatMoney(v[x.f.key]); }).join('; '));
+      };
+    } else if (def.type === 'beneficiaries') {
+      if (!q.draft.rows) q.draft.rows = [{}, {}];
+      var rows = q.draft.rows, list = el('div', { class: 'ben-list' });
+      rows.forEach(function (row, i) {
+        function inp(key, attrs) {
+          if (row[key] != null) attrs.value = row[key];
+          attrs.class = 'input'; attrs.autocomplete = 'off';
+          var e = el('input', attrs);
+          e.addEventListener('input', function () { row[key] = e.value; });
+          row['_' + key] = e;
+          return e;
+        }
+        list.appendChild(el('fieldset', { class: 'ben' },
+          el('legend', {}, 'Beneficiary ' + (i + 1)),
+          el('div', { class: 'q-grid' },
+            labelled('Name', inp('name', { type: 'text', maxlength: '80' })),
+            labelled('Share of income (%)', inp('share', { type: 'text', inputmode: 'decimal', maxlength: '6' }), 'narrow'),
+            labelled('Address', inp('address', { type: 'text', maxlength: '120' }), 'wide'),
+            labelled('SSN or other identifying number', inp('tin', { type: 'password', inputmode: 'numeric', maxlength: '11', placeholder: '000-00-0000' }))),
+          rows.length > 1 ? el('button', { type: 'button', class: 'link-btn', onclick: function () { rows.splice(i, 1); renderMessages(); } }, 'Remove beneficiary ' + (i + 1)) : null));
+      });
+      body.push(list, el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { rows.push({}); renderMessages(); } }, '+ Add a beneficiary'),
+        el('p', { class: 'fine' }, 'Use made-up names and numbers. Shares must add up to 100%.'));
+      onSave = function () {
+        var out = [], tins = [], total = 0, seen = {};
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i], name = String(row.name || '').replace(/\s+/g, ' ').trim(), share = parseFloat(row.share), tin = nineDigits(row.tin);
+          if (!name) return fail('Enter a name for beneficiary ' + (i + 1) + '.', row._name);
+          if (TRP.ai.findTins(name + ' ' + (row.address || '')).length) return fail('Do not type an identifying number in the name or address.', row._name);
+          if (seen[name.toLowerCase()]) return fail('Two beneficiaries have the same name.', row._name);
+          if (!isFinite(share) || share <= 0 || share > 100) return fail('Enter a share between 0 and 100 for ' + name + '.', row._share);
+          if (!String(row.address || '').trim()) return fail('Enter an address for ' + name + '.', row._address);
+          if (!tin) return fail('Enter nine digits for ' + name + "'s identifying number.", row._tin);
+          seen[name.toLowerCase()] = true;
+          total += share;
+          tins.push(tin);
+          out.push({ name: name, address: String(row.address).trim(), share: share, tin: TRP.ai.maskTin(tin, 'ssn') });
+        }
+        if (Math.abs(total - 100) > 0.01) return fail('The shares add up to ' + Math.round(total * 100) / 100 + '%. They must add up to 100%.');
+        r.pii.beneficiaries = tins;
+        q.draft = {};
+        submit(out, out.map(function (b) { return b.name + ' ' + b.share + '%'; }).join(', '));
+      };
+    }
+
+    var form = el('form', { class: 'q-form', novalidate: true });
+    body.forEach(function (node) { form.appendChild(node); });
+    form.appendChild(error);
+    form.appendChild(el('div', { class: 'btn-row' }, el('button', { type: 'submit', class: 'btn btn-primary' }, 'Save answer'), extra));
+    form.addEventListener('submit', function (e) { e.preventDefault(); q.error = ''; onSave(); });
+    return form;
+  }
+
+  function renderQuestion(r, q) {
+    var card = el('div', { class: 'question' + (q.superseded ? ' is-superseded' : '') },
+      el('span', { class: 'question-count' }, q.count),
+      el('p', { class: 'question-text' }, q.text));
+
+    if (q.superseded) {
+      card.appendChild(el('p', { class: 'fine' }, q.answerLabel ? 'Earlier answer: ' + q.answerLabel + '. Changed since.' : 'No longer needed.'));
+      return card;
+    }
+    if (q.answer != null && q.pid) {
+      card.appendChild(el('div', { class: 'q-answer' },
+        el('span', {}, el('strong', {}, 'Your answer: '), q.answerLabel),
+        el('button', { type: 'button', class: 'link-btn', onclick: function () { changeAnswer(r, q); } }, 'Change')));
+    } else if (!q.pid || q.type === 'choice') {
+      var options = el('div', { class: 'question-options', role: 'group', 'aria-label': 'Answers' });
+      q.options.forEach(function (opt) {
+        options.appendChild(el('button', {
+          type: 'button', class: 'btn btn-outline',
+          disabled: q.answer != null,
+          'aria-pressed': q.answer === opt.value ? 'true' : null,
+          onclick: function () { q.pid ? answerProfile(r, q, opt.value, opt.label) : answerQuestion(r, q, opt); }
+        }, opt.label));
+      });
+      card.appendChild(options);
+    } else {
+      card.appendChild(answerForm(r, q, function (value, label) { answerProfile(r, q, value, label); }));
+    }
+    card.appendChild(el('div', { class: 'question-meta' },
+      el('p', {}, el('strong', {}, "Why I'm asking: "), q.why), sourceNode(q)));
+    return card;
+  }
+
+  /* ---------- Trust profile flow ---------- */
+
+  /** What the documents say that the profile rules need. */
+  function docFacts(r) {
+    var f = { principalDist: null, taxExempt: 0, hasPrior: false, prior: { type: null, name: null, ein: null, st: null, lt: null, bens: null, year: null } };
+    var map = { prior_type: 'type', prior_name: 'name', prior_ein: 'ein', prior_stcl: 'st', prior_ltcl: 'lt', prior_bens: 'bens', prior_year: 'year' };
+    r.items.forEach(function (it) {
+      if (it.value === null) return;
+      if (it.fieldId === 'sum_principal_dist') f.principalDist = (f.principalDist || 0) + it.value;
+      else if (it.fieldId === 'int_8' || it.fieldId === 'div_12') f.taxExempt += it.value;
+      else if (map[it.fieldId]) f.prior[map[it.fieldId]] = it.value;
+    });
+    f.hasPrior = r.docs.some(function (d) { return d.forms && d.forms.indexOf('PRIOR') !== -1; });
+    return f;
+  }
+
+  function ctxOf(r) {
+    var a = {};
+    Object.keys(r.answers).forEach(function (k) { a[k] = r.answers[k].value; });
+    return { a: a, facts: docFacts(r), pii: r.pii };
+  }
+  TRP.ctxOf = ctxOf;
+  TRP.pendingQuestion = function () { var r = active(); return r ? pendingQuestion(r) : null; };
+
+  function pendingQuestion(r) {
+    for (var i = r.messages.length - 1; i >= 0; i--) {
+      var blocks = r.messages[i].blocks || [];
+      for (var j = 0; j < blocks.length; j++) {
+        var q = blocks[j].q;
+        if (blocks[j].type === 'question' && q.pid && q.answer == null && !q.superseded) return q;
+      }
+    }
+    return null;
+  }
+
+  function profileStatus(r) {
+    var ctx = ctxOf(r), c = TRP.profile.classify(ctx.a);
+    if (TRP.profile.stop(ctx)) return ctx.a.entity === 'unsure' || ctx.a.domestic === 'unsure' || ctx.a.business === 'unsure' ? 'Paused: needs the reviewer' : 'Out of scope';
+    if (ctx.a.classification) return (ctx.a.classification === 'simple' ? 'Simple trust' : 'Complex trust') + ' · confirmed by you';
+    if (!c.pending && !c.decided) return 'Simple or complex: undecided';
+    return 'Simple or complex: pending your answers';
+  }
+
+  function startProfile(r) {
+    if (r.profileStarted || r.blocked || !r.acked) return;
+    r.profileStarted = true;
+    say(r, "Now the questions the documents can't answer. I'll ask them one at a time, and you can change any answer later.");
+    log('profile.started', {}, r);
+    askNext(r);
+  }
+
+  function askNext(r) {
+    if (!r.profileStarted || r.blocked) return;
+    var ctx = ctxOf(r), P = TRP.profile;
+    var stop = P.stop(ctx);
+    var pending = pendingQuestion(r);
+    if (pending) {
+      var still = !stop && P.applicable(ctx).some(function (d) { return d.id === pending.pid; });
+      if (still) {                      // facts may have changed since it was asked (a new document, say)
+        var fresh = P.resolve(pending.def, ctx);
+        pending.text = fresh.text; pending.options = fresh.options;
+        return;
+      }
+      pending.superseded = true;
+    }
+    r.status = profileStatus(r);
+    if (stop) {
+      if (r.stopShown !== stop.text) {
+        r.stopShown = stop.text;
+        var cite = stop.source ? TRP.knowledge.byId[stop.source] : null;
+        say(r, [{ type: 'p', text: stop.text },
+          { type: 'p', small: true, text: cite ? 'Source: ' + cite.source + ' · ' + cite.section : 'Source: app boundary, not an IRS rule' },
+          { type: 'p', small: true, text: 'If that answer was a mistake, use Change on it above.' }]);
+        log('profile.stopped', { reason: stop.text }, r);
+      }
+      return;
+    }
+    r.stopShown = null;
+    if (r.awaitingChange) return;
+    var def = P.next(ctx);
+    if (!def) { finishProfile(r, ctx); return; }
+    r.profileDone = false;
+    var all = P.applicable(ctx), done = all.filter(function (d) { return d.id in ctx.a; }).length;
+    var res = P.resolve(def, ctx);
+    say(r, [{ type: 'question', q: {
+      id: 'p' + (++state.msgSeq), pid: def.id, def: def, type: def.type, sourceId: def.source,
+      // The total is only known once the scope and classification questions are behind us.
+      count: 'Question ' + (done + 1) + (all.length > 8 ? ' of ' + all.length : '') + ' · ' + def.section,
+      text: res.text, options: res.options, why: def.why, answer: null, answerLabel: '', draft: {}, error: ''
+    } }]);
+  }
+
+  function answerProfile(r, q, value, label) {
+    if (q.answer != null || q.superseded) return;
+    var def = q.def;
+    if (def.id === 'classification' && value === 'redo') {
+      q.superseded = true; q.answerLabel = '';
+      r.awaitingChange = true;
+      userSays(r, label);
+      say(r, 'No problem. Use Change on the answer you want to correct, and I will work it out again.');
+      log('profile.answer', { question: def.id, answer: label }, r);
+      renderAll();
+      return;
+    }
+    q.answer = value; q.answerLabel = label;
+    var unsure = value === 'unsure' || (value && value.skipped);
+    r.answers[def.id] = { value: value, label: label, confidence: unsure ? 'low' : 'high', reason: unsure ? 'You answered Not sure' : 'You answered this directly' };
+    r.dirty = true;
+    userSays(r, label);
+    log('profile.answer', { question: def.id, text: q.text, answer: label, confidence: unsure ? 'low' : 'high' }, r);
+
+    if (def.id === 'classification') {
+      var c = TRP.profile.classify(ctxOf(r).a);
+      log('classification.decided', { result: value, rule: 'Simple trust test, Instructions for Form 1041 (i1041-simple-trust)', failed: c.reasons, confirmedBy: 'user' }, r);
+    }
+    if (def.id === 'trust_name' && !r.named) r.name = value;
+    if (def.id === 'ein_conflict' && value === 'reenter') {
+      ['ein', 'ein_conflict'].forEach(function (id) { supersede(r, id); delete r.answers[id]; });
+      delete r.pii.ein;
+    }
+    recount(r);
+    askNext(r);
+    renderAll();
+  }
+
+  /** Marks the answered card for a question as replaced, so a new one can be asked. */
+  function supersede(r, pid) {
+    r.messages.forEach(function (m) {
+      (m.blocks || []).forEach(function (b) {
+        if (b.type === 'question' && b.q.pid === pid && !b.q.superseded) b.q.superseded = true;
+      });
+    });
+  }
+
+  function changeAnswer(r, q) {
+    if (r.busy) return;
+    var def = q.def;
+    log('profile.changed', { question: def.id, was: q.answerLabel }, r);
+    q.superseded = true;
+    delete r.answers[def.id];
+    if (def.type === 'tin') delete r.pii[def.id];
+    if (def.type === 'beneficiaries') delete r.pii.beneficiaries;
+    (def.clears || []).forEach(function (id) { if (id in r.answers) { supersede(r, id); delete r.answers[id]; } });
+    r.awaitingChange = false;
+    recount(r);
+    askNext(r);
+    renderAll();
+  }
+
+  function finishProfile(r, ctx) {
+    r.status = profileStatus(r);
+    if (r.profileDone) return;
+    r.profileDone = true;
+    if (r.step === 'documents' || r.step === 'profile') r.step = 'review';
+    var flags = TRP.profile.flags(ctx);
+    var blocks = [{ type: 'p', text: "That's everything I need for the trust profile." },
+      { type: 'ul', items: TRP.profile.summary(ctx).map(function (row) { return row[0] + ': ' + row[1]; }) }];
+    var low = flags.filter(function (f) { return f.level === 'low'; }), esc = flags.filter(function (f) { return f.level === 'escalate'; });
+    if (low.length) {
+      blocks.push({ type: 'p', text: 'Low confidence, to resolve before the return can be generated:' });
+      blocks.push({ type: 'ul', items: low.map(function (f) { return f.text + '.'; }) });
+    }
+    if (esc.length) {
+      blocks.push({ type: 'p', text: 'For the reviewer, outside what this tool computes:' });
+      blocks.push({ type: 'ul', items: esc.map(function (f) { return f.text + '.'; }) });
+    }
+    blocks.push({ type: 'p', text: 'Next is the review of low-confidence items, then the calculation. Those steps are built in later milestones.' });
+    say(r, blocks);
+    log('profile.complete', { summary: TRP.profile.summary(ctx), flags: flags }, r);
+  }
+
 
   function renderChips(names) {
     var list = el('ul', { class: 'chips', 'aria-label': 'Attached files' });
@@ -390,7 +743,8 @@
       log('documents.uploaded', { files: fresh.map(function (f) { return { name: f.name, bytes: f.size, type: f.type || 'unknown' }; }) });
       processFiles(r, fresh);
     } else if (text && !skipped.length) {
-      say(r, 'Questions about the return are answered in a later milestone. Nothing you typed was sent to an AI model.');
+      say(r, pendingQuestion(r) ? 'Please use the question card above to answer. Nothing you typed was sent to an AI model.'
+        : 'Questions about the return are answered in a later milestone. Nothing you typed was sent to an AI model.');
     }
     state.pending = [];
     input.value = '';
@@ -448,6 +802,12 @@
   function recount(r) {
     r.counts = { high: 0, medium: 0, low: 0 };
     r.items.forEach(function (i) { r.counts[i.confidence]++; });
+    // Profile answers given directly are High. Not-sure answers and failed cross-checks are Low.
+    Object.keys(r.answers).forEach(function (k) { if (r.answers[k].confidence === 'high') r.counts.high++; });
+    var flags = TRP.profile.flags(ctxOf(r));
+    r.counts.low += flags.filter(function (f) { return f.level === 'low'; }).length;
+    r.escalated = flags.filter(function (f) { return f.level === 'escalate'; }).length +
+      r.items.filter(function (i) { return i.escalate && i.value; }).length;
   }
 
   function addItems(r, doc, items) {
@@ -521,6 +881,8 @@
     var blocks = resultBlocks(r, docs, itemIds, useAi);
     blocks.push({ type: 'p', text: timingNote(r, logStart, started, useAi), small: true });
     say(r, blocks);
+    if (r.items.length) startProfile(r);
+    askNext(r);                         // new documents can answer, or change, a pending question
     r.busy = false;
     if (r.items.length && r.step === 'documents') r.step = 'profile';
     r.dirty = true;
@@ -579,7 +941,6 @@
       }) });
     }
 
-    if (read.length) blocks.push({ type: 'p', text: "Next come the questions these documents can't answer. That step is built in the next milestone. You can keep adding documents." });
     return blocks;
   }
 
@@ -602,7 +963,7 @@
       el('table', { class: 'items-table' },
         el('thead', {}, el('tr', {},
           el('th', { scope: 'col' }, 'Document'), el('th', { scope: 'col' }, 'Item'),
-          el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Confidence'))),
+          el('th', { scope: 'col', class: 'num' }, 'Value'), el('th', { scope: 'col' }, 'Confidence'))),
         body));
   }
 
@@ -626,6 +987,7 @@
     item.confidence = 'high';
     item.reason = 'Confirmed by you';
     recount(r);
+    askNext(r);
     renderAll();
   }
 
@@ -638,6 +1000,8 @@
     log('item.override', { document: findDoc(r, item.docId).name, item: itemLabel(item), from: before, to: itemAmount(item) }, r);
     recount(r);
     state.panel.editing = false;
+    askNext(r);
+    recount(r);
     renderAll();
   }
 
@@ -723,20 +1087,36 @@
         input = el('select', { class: 'input', id: 'edit-value' },
           el('option', { value: 'long', selected: item.value === 'long' }, 'Long-term'),
           el('option', { value: 'short', selected: item.value === 'short' }, 'Short-term'));
+      } else if (f.kind === 'choice') {
+        input = el('select', { class: 'input', id: 'edit-value' });
+        Object.keys(f.choices).forEach(function (k) { input.appendChild(el('option', { value: k, selected: item.value === k }, f.choices[k])); });
+      } else if (f.kind === 'tin') {
+        input = el('input', { class: 'input', id: 'edit-value', type: 'password', inputmode: 'numeric', maxlength: '11', autocomplete: 'off', placeholder: '00-0000000' });
+      } else if (f.kind === 'text' || f.kind === 'list') {
+        input = el('input', { class: 'input', id: 'edit-value', type: 'text', autocomplete: 'off',
+          value: item.value === null ? '' : f.kind === 'list' ? item.value.join(', ') : String(item.value) });
       } else {
         input = el('input', { class: 'input', id: 'edit-value', type: 'text', inputmode: 'decimal', autocomplete: 'off',
           value: item.value === null ? '' : String(item.value) });
       }
       var form = el('form', { class: 'edit-form', novalidate: true },
-        el('label', { class: 'field-label', for: 'edit-value' }, f.kind === 'term' ? 'Holding period' : 'Correct amount'),
+        el('label', { class: 'field-label', for: 'edit-value' }, f.kind === 'term' ? 'Holding period' : f.kind === 'amount' ? 'Correct amount'
+          : f.kind === 'list' ? 'Correct names, separated by commas' : f.kind === 'tin' ? 'Correct number (nine digits)' : 'Correct value'),
         input, error,
         el('div', { class: 'btn-row' },
           el('button', { type: 'submit', class: 'btn btn-primary' }, 'Save'),
           el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { state.panel.editing = false; renderPanel(); } }, 'Cancel')));
       form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var value = f.kind === 'term' ? input.value : readAmount(input.value);
-        if (value === null) { error.textContent = 'Enter an amount such as 1,200.00.'; input.focus(); return; }
+        var value = f.kind === 'term' || f.kind === 'choice' ? input.value
+          : f.kind === 'tin' ? nineDigits(input.value)
+          : f.kind === 'text' ? (input.value.trim() && !TRP.ai.findTins(input.value).length ? input.value.trim() : null)
+          : f.kind === 'list' ? (input.value.trim() ? input.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : null)
+          : readAmount(input.value);
+        if (value === null) {
+          error.textContent = f.kind === 'amount' ? 'Enter an amount such as 1,200.00.' : f.kind === 'tin' ? 'Enter nine digits.' : 'Enter a value, without any SSN or EIN.';
+          input.focus(); return;
+        }
         editItem(r, item, value);
       });
       body.appendChild(form);
@@ -846,6 +1226,7 @@
 
     var typeSelect = el('select', { class: 'input', id: 'manual-type' });
     Object.keys(TRP.extract.FORMS).forEach(function (id) {
+      if (TRP.extract.FORMS[id].noManual) return;
       typeSelect.appendChild(el('option', { value: id, selected: id === panel.formId }, TRP.extract.FORMS[id].title));
     });
     typeSelect.addEventListener('change', function () { panel.formId = typeSelect.value; panel.error = ''; renderPanel(); });
@@ -912,6 +1293,8 @@
       r.dirty = true;
       recount(r);
       state.panel = null;
+      startProfile(r);
+      askNext(r);
       renderAll();
     });
 
@@ -984,7 +1367,10 @@
         el('button', {
           type: 'button', class: 'step-btn',
           'aria-current': st === 'current' ? 'step' : null,
-          onclick: function () { setView(s.view); closeDrawers(); }
+          onclick: function () {
+            setView(s.view); closeDrawers();
+            if (s.id === 'profile' && r && !r.profileStarted) { startProfile(r); renderAll(); }
+          }
         },
           el('span', { class: 'step-num', 'aria-hidden': 'true' }, st === 'done' ? '✓' : ''),
           el('span', { class: 'step-body' },
@@ -998,6 +1384,7 @@
         el('span', { class: 'badge badge-' + c.id }, el('span', { 'aria-hidden': 'true' }, c.symbol), ' ' + c.label),
         el('span', { class: 'count-num' }, String(r ? r.counts[c.id] : 0))));
     });
+    if (r && r.escalated) counts.appendChild(el('li', {}, el('span', { class: 'flag flag-count' }, 'For the reviewer'), el('span', { class: 'count-num' }, String(r.escalated))));
   }
 
   function renderLogCount() {
@@ -1041,6 +1428,9 @@
   }
 
   function renderAll() {
+    var cur = active();
+    if (cur && cur.profileStarted) { cur.status = profileStatus(cur); $('#topbar-status').textContent = cur.blocked ? 'Closed' : cur.status; }
+    if (cur) $('#topbar-title').textContent = cur.name;
     renderSidebar();
     renderProgress();
     renderMessages();

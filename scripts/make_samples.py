@@ -147,6 +147,48 @@ def summary(path, trust, rows, note):
     c.save()
 
 
+def prior_return(path, trust, ein, entity, st_loss, lt_loss, beneficiaries, year=2024):
+    """A prior-year return in a simplified layout (not the IRS form), with one K-1 page per beneficiary."""
+    c = canvas.Canvas(path, pagesize=letter)
+    c.setTitle(f"{STAMP} - prior-year Form 1041")
+    page_frame(c, "Form 1041", f"U.S. Income Tax Return for Estates and Trusts   -   simplified sample layout, not the IRS form")
+    y = H - 112
+    c.setFont("Helvetica", 10)
+    for label, value in [("Tax year:", str(year)), ("Name of estate or trust:", trust),
+                         ("Employer identification number:", ein), ("Name and title of fiduciary:", "Rowan Ashby, Trustee")]:
+        c.drawString(54, y, label)
+        c.drawString(230, y, value)
+        y -= 18
+    y -= 8
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(54, y, "A  Type of entity")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.drawString(66, y, ("[X]" if entity == "simple" else "[ ]") + " Simple trust")
+    c.drawString(230, y, ("[X]" if entity == "complex" else "[ ]") + " Complex trust")
+    y -= 30
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(54, y, f"Schedule D (Form 1041) - carryovers to {year + 1}")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    for label, value in [("Short-term capital loss carryover", st_loss), ("Long-term capital loss carryover", lt_loss)]:
+        c.drawString(66, y, label)
+        c.drawRightString(W - 60, y, "$" + money(value))
+        y -= 18
+    c.showPage()
+    for i, name in enumerate(beneficiaries):
+        page_frame(c, "Schedule K-1 (Form 1041)", f"Beneficiary's Share of Income, Deductions, Credits, etc.   -   {year}   -   simplified sample layout")
+        y = H - 112
+        c.setFont("Helvetica", 10)
+        for label, value in [("Estate's or trust's name:", trust), ("Beneficiary's name:", name),
+                             ("Beneficiary's identifying number:", f"900-00-000{i + 1}")]:
+            c.drawString(54, y, label)
+            c.drawString(230, y, value)
+            y -= 18
+        c.showPage()
+    c.save()
+
+
 def scanned(path):
     """An image-only page: no text layer, as from a poor scan."""
     from PIL import Image, ImageDraw, ImageFilter
@@ -200,6 +242,10 @@ def main():
 
     # Case 6: an unreadable scan
     scanned(p("case6", "1099-INT_scanned.pdf"))
+
+    # Case 7: not the first year - a prior-year return with a capital loss carryover
+    prior_return(p("case7", "Prior_year_Form_1041_2024.pdf"), "Maple Street Trust", "00-0000002", "simple",
+                 0, 3000, ["Avery Maple", "Jordan Maple"])
 
     # Extra documents that exercise the checks
     form_1099(p("checks", "1099-DIV_foreign_and_199A.pdf"), "1099-DIV", "Dividends and Distributions",
