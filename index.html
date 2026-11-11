@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trust Return Preparer – Form 1041 draft (2025)</title>
+<meta name="description" content="A bounded, AI-assisted prototype that prepares a draft Form 1041 for simple and complex trusts. Synthetic data only.">
+<script>
+  // Apply the saved theme before first paint. Theme is the only thing kept in localStorage.
+  try {
+    var t = localStorage.getItem('trp-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div class="app" id="app">
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="sidebar" id="sidebar" aria-label="Returns and settings">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">1041</span>
+      <span class="brand-name">Trust Return Preparer</span>
+    </div>
+
+    <button type="button" class="btn btn-outline btn-block" id="new-return-btn">
+      <span aria-hidden="true">+</span> New return
+    </button>
+
+    <nav class="return-nav" aria-label="This session's returns">
+      <h2 class="side-heading">Recent returns</h2>
+      <ul class="return-list" id="return-list"></ul>
+      <p class="side-empty" id="return-empty">No returns yet. Nothing is saved after you close this tab.</p>
+    </nav>
+
+    <div class="side-foot">
+      <button type="button" class="key-status" id="key-status-btn" data-state="disconnected">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3M14 9l2 2"/></svg>
+        <span id="key-status-text">API key · Not connected</span>
+      </button>
+      <button type="button" class="btn btn-ghost btn-block side-link" id="settings-btn">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        Settings &amp; sources
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ Main column ============ -->
+  <main class="main" id="main" tabindex="-1">
+    <header class="topbar">
+      <button type="button" class="icon-btn only-narrow-sidebar" id="open-sidebar-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1 class="topbar-title" id="topbar-title">Trust Return Preparer</h1>
+      <span class="topbar-status" id="topbar-status" hidden></span>
+      <button type="button" class="btn btn-ghost only-narrow-progress" id="open-progress-btn" aria-controls="progress" aria-expanded="false" hidden>Progress</button>
+    </header>
+
+    <!-- ---- Screen 1: first run ---- -->
+    <section class="view view-first-run" id="view-first-run" aria-labelledby="first-run-title">
+      <div class="first-run">
+        <h2 id="first-run-title">Let's prepare a trust return.</h2>
+        <p class="lede">Drop the trustee's year-end documents. I'll ask a few questions, show my confidence on every entry, and fill Form 1041 and each beneficiary's K-1.</p>
+
+        <form class="key-card key-form" data-key-form novalidate>
+          <div class="key-card-text">
+            <label class="key-card-title" for="first-key-input">Connect your own API key <span class="optional">optional</span></label>
+            <p class="fine">Kept in this tab only. Never sent anywhere except the AI provider. Without a key, you enter values yourself.
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a free Gemini key</a>.</p>
+            <p class="key-line" data-key-line aria-live="polite">
+              <span class="status-dot" data-key-dot data-state="disconnected" aria-hidden="true"></span>
+              <span data-key-message>No API key connected</span>
+            </p>
+          </div>
+          <div class="key-row">
+            <input class="input" id="first-key-input" data-key-input type="password" autocomplete="off" spellcheck="false" placeholder="Paste API key">
+            <button type="submit" class="btn btn-primary" data-key-submit>Connect</button>
+          </div>
+        </form>
+
+        <button type="button" class="dropzone" id="first-dropzone">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+          <strong>Drop PDFs here</strong>
+          <span class="fine">1099-INT · 1099-DIV · 1099-B · distribution &amp; expense summary · prior-year return</span>
+        </button>
+
+        <form class="composer first-composer" id="first-composer" novalidate>
+          <div class="composer-row">
+            <label class="sr-only" for="first-input">Message</label>
+            <textarea class="composer-input" id="first-input" rows="2" placeholder="Tell me about the trust, or just drop the documents…"></textarea>
+            <button type="submit" class="icon-btn send-btn" id="start-btn" aria-label="Start a return">
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </form>
+
+        <ul class="tags" aria-label="Scope">
+          <li class="tag">Simple &amp; complex trusts only</li>
+          <li class="tag">Tax year 2025</li>
+          <li class="tag">Answers cite IRS sources only</li>
+        </ul>
+
+        <p class="disclaimer" role="note">Draft for professional review. This tool does not file with the IRS, send K-1s, or make tax elections. <strong>Use synthetic data only.</strong></p>
+      </div>
+    </section>
+
+    <!-- ---- Screen 2: chat ---- -->
+    <section class="view view-chat" id="view-chat" aria-label="Return conversation" hidden>
+      <div class="chat-scroll" id="chat-scroll">
+        <div class="chat-col" id="messages" role="log" aria-live="polite" aria-label="Conversation"></div>
+      </div>
+
+      <div class="composer-wrap">
+        <form class="composer chat-col" id="composer" novalidate>
+          <ul class="chips" id="pending-files" aria-label="Files to attach"></ul>
+          <div class="composer-row">
+            <label class="icon-btn attach-btn" for="file-input" title="Attach documents">
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1 12.2 20.3a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>
+              <span class="sr-only">Attach documents (PDF, PNG or JPG)</span>
+            </label>
+            <input class="sr-only" type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg">
+            <label class="sr-only" for="composer-input">Message</label>
+            <textarea class="composer-input" id="composer-input" rows="1" placeholder="Type an answer or drop documents here"></textarea>
+            <button type="submit" class="icon-btn send-btn" id="send-btn" aria-label="Send" disabled>
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </form>
+        <p class="footer-note">Synthetic data only · DRAFT – for professional review · Nothing is filed with the IRS · Nothing is saved after this tab closes</p>
+      </div>
+
+      <div class="drop-overlay" id="drop-overlay" hidden aria-hidden="true">
+        <div class="drop-box">Drop documents to attach them</div>
+      </div>
+    </section>
+
+    <!-- ---- Screen 3: review gate ---- -->
+    <section class="view view-page" id="view-review" aria-labelledby="review-title" hidden>
+      <div class="page-scroll"><div class="page-col">
+        <button type="button" class="btn btn-ghost back-btn" data-goto="chat">← Back to conversation</button>
+        <h2 id="review-title">Before I generate your return</h2>
+        <p class="muted">Confirm, correct or escalate every low-confidence item below. Medium items are worth a look but won't block the return.</p>
+
+        <h3>Low confidence</h3>
+        <div class="empty-state" id="low-list">No items yet. Low-confidence items appear here once documents are read.</div>
+
+        <h3>Medium confidence <span class="optional">optional</span></h3>
+        <div class="empty-state" id="medium-list">No items yet.</div>
+
+        <h3>How confidence is assigned</h3>
+        <ul class="legend">
+          <li><span class="badge badge-high"><span aria-hidden="true">●</span> High</span> <span class="reason">Two reads agree, the quote is verified and all checks pass, or you confirmed it.</span></li>
+          <li><span class="badge badge-medium"><span aria-hidden="true">◐</span> Medium</span> <span class="reason">Only one read method, or a minor issue.</span></li>
+          <li><span class="badge badge-low"><span aria-hidden="true">○</span> Low</span> <span class="reason">Reads disagree, a check failed, or the value rests on an assumption.</span></li>
+        </ul>
+        <p class="fine">Confidence comes from code checks. The AI never rates itself.</p>
+      </div></div>
+      <div class="gate-bar">
+        <div class="gate">
+          <span id="gate-label">0 of 0 low-confidence items resolved</span>
+          <div class="progress-bar" role="progressbar" aria-labelledby="gate-label" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <span class="progress-fill" id="gate-fill" style="width:0%"></span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary" id="generate-btn" disabled>Generate Form 1041 · finish documents and trust profile first</button>
+      </div>
+    </section>
+
+    <!-- ---- Screen 4: completed return ---- -->
+    <section class="view view-page" id="view-complete" aria-labelledby="complete-title" hidden>
+      <div class="page-scroll"><div class="page-col">
+        <button type="button" class="btn btn-ghost back-btn" data-goto="chat">← Back to conversation</button>
+        <h2 id="complete-title">Generate &amp; sign off</h2>
+        <p class="draft-banner">DRAFT – for professional review</p>
+        <p class="muted">The completed forms, key lines and reviewer sign-off appear here once the return is generated.</p>
+
+        <div class="download-grid">
+          <div class="card download-card is-locked"><h3>Form 1041</h3><p class="muted">Includes Schedules B and G</p><button type="button" class="btn btn-outline" disabled>Download</button></div>
+          <div class="card download-card is-locked"><h3>Schedule K-1s</h3><p class="muted">One per beneficiary</p><button type="button" class="btn btn-outline" disabled>Download</button></div>
+          <div class="card download-card is-locked"><h3>Schedule D</h3><p class="muted">Capital gains and losses</p><button type="button" class="btn btn-outline" disabled>Download</button></div>
+          <div class="card download-card is-locked"><h3>Review log</h3><p class="muted">PDF and JSON</p><button type="button" class="btn btn-outline" disabled>Download</button></div>
+        </div>
+
+        <form class="card signoff" novalidate>
+          <h3>Reviewer sign-off</h3>
+          <label class="field-label" for="reviewer-name">Reviewer name</label>
+          <input class="input" id="reviewer-name" type="text" autocomplete="off" disabled>
+          <div class="btn-row">
+            <button type="button" class="btn btn-primary" disabled>Approve</button>
+            <button type="button" class="btn btn-outline" disabled>Return with comments</button>
+          </div>
+          <p class="fine">Available after the return is generated. The sign-off is recorded in the review log.</p>
+        </form>
+      </div></div>
+    </section>
+  </main>
+
+  <!-- ============ Return progress panel ============ -->
+  <aside class="progress-panel" id="progress" aria-labelledby="progress-title" hidden>
+    <div class="panel-head">
+      <h2 id="progress-title">Return progress</h2>
+      <button type="button" class="icon-btn only-narrow-progress" id="close-progress-btn" aria-label="Close progress panel">✕</button>
+    </div>
+    <ol class="steps" id="steps"></ol>
+
+    <h3 class="panel-sub">Confidence so far</h3>
+    <ul class="counts" id="counts"></ul>
+    <p class="fine">Low-confidence items must be confirmed or corrected before the return can be generated.</p>
+    <button type="button" class="btn btn-ghost btn-block" id="open-log-btn">Session log (<span id="log-count">0</span>)</button>
+    <button type="button" class="btn btn-primary btn-block panel-cta" id="review-btn">Review &amp; generate</button>
+  </aside>
+</div>
+
+<div class="backdrop" id="backdrop" hidden></div>
+
+<!-- ============ Settings & sources ============ -->
+<dialog class="dialog" id="settings-dialog" aria-labelledby="settings-title">
+  <div class="dialog-head">
+    <h2 id="settings-title">Settings &amp; sources</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close settings">✕</button>
+  </div>
+  <div class="dialog-body">
+    <fieldset class="setting">
+      <legend>Theme</legend>
+      <div class="segmented" role="radiogroup" aria-label="Theme">
+        <label><input type="radio" name="theme" value="light"> <span>Light</span></label>
+        <label><input type="radio" name="theme" value="dark"> <span>Dark</span></label>
+      </div>
+      <p class="fine">Your theme choice is the only thing this app saves on your device.</p>
+    </fieldset>
+
+    <form class="setting key-form" data-key-form novalidate>
+      <h3>AI provider</h3>
+      <label class="field-label" for="settings-key-input">Google Gemini API key</label>
+      <div class="key-row">
+        <input class="input" id="settings-key-input" data-key-input type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key">
+        <button type="submit" class="btn btn-primary" data-key-submit>Connect</button>
+      </div>
+      <p class="key-line" data-key-line aria-live="polite">
+        <span class="status-dot" data-key-dot data-state="disconnected" aria-hidden="true"></span>
+        <span data-key-message>No API key connected</span>
+      </p>
+      <div class="model-row" id="model-row" hidden>
+        <label class="field-label" for="model-select">Model</label>
+        <select class="input" id="model-select"></select>
+      </div>
+      <button type="button" class="btn btn-outline" id="disconnect-btn" hidden>Disconnect and clear key</button>
+      <p class="fine">Session storage only. Sent only to the provider. SSNs and EINs are redacted from anything sent to the model.</p>
+    </form>
+
+    <div class="setting">
+      <h3>Sources</h3>
+      <p class="muted">The only authority this app uses. Explanations may cite only excerpts from these documents.</p>
+      <ul class="source-list" id="source-list"></ul>
+    </div>
+
+    <div class="setting">
+      <h3>What this app will not do</h3>
+      <ul class="boundary-list" id="boundary-list"></ul>
+    </div>
+  </div>
+</dialog>
+
+<!-- ============ Session log ============ -->
+<dialog class="dialog" id="log-dialog" aria-labelledby="log-title">
+  <div class="dialog-head">
+    <h2 id="log-title">Session log</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close session log">✕</button>
+  </div>
+  <div class="dialog-body">
+    <p class="muted">Every event in this return. SSNs and EINs are masked. Export arrives with the review log in a later milestone.</p>
+    <ol class="log-list" id="log-list"></ol>
+  </div>
+</dialog>
+
+<!-- Classic scripts (no modules) so the app also runs when index.html is opened from disk. -->
+<script src="rules/constants_2025.js"></script>
+<script src="rules/engine.js"></script>
+<script src="ai.js"></script>
+<script src="extract.js"></script>
+<script src="pdf/fill.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

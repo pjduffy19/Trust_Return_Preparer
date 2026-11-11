@@ -1,0 +1,6 @@
+{
+  "_status": "Not built yet. Milestone 6 generates this from the AcroForm field names and tooltips in the IRS PDFs in /sources. No field names are guessed.",
+  "form1041": {},
+  "scheduleD": {},
+  "scheduleK1": {}
+}
