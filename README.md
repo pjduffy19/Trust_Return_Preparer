@@ -15,12 +15,39 @@ To use AI-assisted intake, paste your own Google Gemini API key on the first scr
 | Milestone | What | Status |
 |---|---|---|
 | 1 | Repo skeleton, UI shell (light/dark), API key handling, session-only state | Built |
-| 2 | Document upload, two-method extraction, validations, confidence, source panel | Not started |
+| 2 | Document upload, two-method extraction, validations, confidence, source panel | Built |
 | 3 | Trust profile questions, simple/complex classification, out-of-scope refusal, prior-year flow | Not started |
 | 4 | Rules engine, cited constants, test cases 1–4 | Not started |
 | 5 | Review gate, escalations, test cases 5–7 | Not started |
 | 6 | PDF field mapping and filling, review log export, reviewer sign-off | Not started |
 | 7 | Full README, known limitations, boundary check | Not started |
+
+## How documents are read
+
+1. **Classify.** Rules look for the form name in the PDF's text layer: 1099-INT, 1099-DIV, 1099-B, the trustee's distribution and expense summary, or a prior-year Form 1041 (held for the trust profile step).
+2. **Read twice.** A rule-based parser finds each box label and the amount beside or beneath it. If an AI key is connected, the AI also reads the page and must return each amount with an exact quote and page number. SSNs and EINs are redacted before any text is sent.
+3. **Check.** Code confirms the quote is really on that page and contains the amount, compares the two reads, and runs validation rules (for example, qualified dividends cannot exceed ordinary dividends).
+4. **Score.** High: both reads agree, the quote checks out and the rules pass, or you confirmed the value. Medium: one read only, or a non-standard document. Low: the reads disagree, the evidence fails, or a rule fails. The AI never rates itself.
+
+Scans and images have no text layer and cannot be redacted, so they are never sent to the AI. They go to manual entry. Boxes this tool does not compute (foreign tax, Section 199A dividends, wash sales, backup withholding and other unusual boxes) are flagged for the reviewer.
+
+Click any row to open the source page with the amount highlighted, then confirm or correct it.
+
+## Sample documents
+
+`samples/` holds synthetic PDFs, each stamped "SAMPLE - SYNTHETIC DATA". "Try the sample documents" on the first screen loads `samples/case1`. Regenerate them with `python scripts/make_samples.py` (needs `reportlab` and `pillow`).
+
+- `case1/` baseline simple trust: 1099-INT, 1099-DIV, 1099-B and the trustee's summary
+- `case4/` tax-exempt interest plus trustee fees
+- `case6/` a scan with no text layer (goes to manual entry)
+- `checks/` documents that trip the checks: qualified above ordinary dividends, foreign tax and Section 199A dividends, a short-term wash sale
+
+## Known limitations so far
+
+- The parser expects one transaction or one total per 1099-B. Multi-lot broker statements are not split into lots.
+- The short-term or long-term box is read only when it is printed as text, such as "[X] Long-term". If it is not found, the item is Low and you choose it.
+- Descriptions and dates on Form 1099-B are not captured.
+- Scans and photos are not read at all; their values are typed in by hand.
 
 ## Layout
 
@@ -29,12 +56,14 @@ index.html            app shell (four screens)
 styles.css            light and dark themes via CSS variables
 app.js                UI, chat flow, session state
 ai.js                 provider adapter, schema validation, SSN/EIN redaction
-extract.js            document reading (stub)
+extract.js            document reading: classify, parse, AI read, checks, confidence
 rules/engine.js       deterministic tax calculations (stub)
 rules/constants_2025.js   2025 constants, each cited to the instructions (stub)
 pdf/fill.js           fills the IRS PDFs (stub)
 pdf/field_map_2025.json   return line -> PDF field name (stub)
-knowledge/irs_excerpts.json   the only text the AI may cite (stub)
+knowledge/irs_excerpts.json   the only text the app may cite
+samples/              synthetic test documents
+scripts/make_samples.py   regenerates the samples
 sources/              IRS PDFs
 tests/tests.html      rules-engine test runner (stub)
 ```

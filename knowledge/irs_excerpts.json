@@ -1,4 +1,25 @@
 {
-  "_status": "Not built yet. Milestone 2 onward adds excerpts taken from the IRS PDFs in /sources. Each excerpt has an id, source document, section or page, and text.",
-  "excerpts": []
+  "_about": "Short excerpts copied from the IRS PDFs in /sources. These are the only texts the app may cite. Later milestones add excerpts from the Form 1041 instructions.",
+  "excerpts": [
+    { "id": "int-box1", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 1. Interest Income", "text": "Enter taxable interest not included in box 3." },
+    { "id": "int-box3", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 3. Interest on U.S. Savings Bonds and Treasury Obligations", "text": "Enter interest on U.S. Savings Bonds, Treasury bills, Treasury notes, and Treasury bonds. Do not include in box 1." },
+    { "id": "int-box4", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 4. Federal Income Tax Withheld", "text": "Enter backup withholding." },
+    { "id": "int-box6", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 6. Foreign Tax Paid", "text": "Enter any foreign tax paid on interest. Report this amount in U.S. dollars." },
+    { "id": "int-box8", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 8. Tax-Exempt Interest", "text": "Enter tax-exempt interest that is not OID of $10 or more that is credited or paid to the person's account […]" },
+    { "id": "int-box9", "source": "Instructions for Forms 1099-INT and 1099-OID (Rev. January 2024)", "file": "sources/i1099int_rev2024.pdf", "section": "Box 9. Specified Private Activity Bond Interest", "text": "Enter interest of $10 or more from specified private activity bonds." },
+
+    { "id": "div-box1a", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 1a. Total Ordinary Dividends", "text": "Enter dividends, including dividends from money market funds, net short-term capital gains from mutual funds, and other distributions on stock." },
+    { "id": "div-box1b", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 1b. Qualified Dividends", "text": "Enter the portion of the dividends in box 1a that qualifies for the reduced capital gains rates." },
+    { "id": "div-box2a", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 2a. Total Capital Gain Distr.", "text": "Enter total capital gain distributions (long-term). Include all amounts shown in boxes 2b, 2c, 2d, and 2f." },
+    { "id": "div-box4", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 4. Federal Income Tax Withheld", "text": "Enter backup withholding." },
+    { "id": "div-box5", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 5. Section 199A Dividends", "text": "Enter the qualified REIT dividends paid by a REIT or section 199A dividends paid by a RIC to the recipient. This amount is included in the amount reported in box 1a." },
+    { "id": "div-box7", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 7. Foreign Tax Paid", "text": "Enter foreign tax paid on dividends and other distributions on stock." },
+    { "id": "div-box12", "source": "Instructions for Form 1099-DIV (Rev. January 2024)", "file": "sources/i1099div_rev2024.pdf", "section": "Box 12. Exempt-Interest Dividends", "text": "Enter exempt-interest dividends from a mutual fund or other RIC." },
+
+    { "id": "b-box1d", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 1d. Proceeds", "text": "Enter the gross cash proceeds from all dispositions (including short sales) of securities, commodities, options, securities futures contracts, or forward contracts." },
+    { "id": "b-box1e", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 1e. Cost or Other Basis", "text": "Enter the adjusted basis of any securities sold unless the security is not a covered security and you check box 5." },
+    { "id": "b-box1g", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 1g. Wash Sale Loss Disallowed", "text": "Report wash sale loss amount disallowed." },
+    { "id": "b-box2", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 2. Type of Gain or Loss", "text": "Determine whether the gain or loss is short-term or long-term under section 1222, and whether any portion of the gain or loss is ordinary." },
+    { "id": "b-box4", "source": "Instructions for Form 1099-B (2025)", "file": "sources/i1099b_2025.pdf", "section": "Box 4. Federal Income Tax Withheld", "text": "Enter backup withholding." }
+  ]
 }

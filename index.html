@@ -100,6 +100,11 @@
           </div>
         </form>
 
+        <p class="sample-line">
+          <button type="button" class="link-btn" id="sample-btn">Try the sample documents</button>
+          <span class="fine" id="sample-msg" aria-live="polite"></span>
+        </p>
+
         <ul class="tags" aria-label="Scope">
           <li class="tag">Simple &amp; complex trusts only</li>
           <li class="tag">Tax year 2025</li>
@@ -212,8 +217,18 @@
     <h3 class="panel-sub">Confidence so far</h3>
     <ul class="counts" id="counts"></ul>
     <p class="fine">Low-confidence items must be confirmed or corrected before the return can be generated.</p>
+    <button type="button" class="btn btn-ghost btn-block" id="manual-btn">Add a document by hand</button>
     <button type="button" class="btn btn-ghost btn-block" id="open-log-btn">Session log (<span id="log-count">0</span>)</button>
     <button type="button" class="btn btn-primary btn-block panel-cta" id="review-btn">Review &amp; generate</button>
+  </aside>
+
+  <!-- ============ Source side panel ============ -->
+  <aside class="source-panel" id="source-panel" aria-labelledby="source-title" hidden>
+    <div class="panel-head">
+      <h2 id="source-title">Source</h2>
+      <button type="button" class="icon-btn" id="source-close" aria-label="Close source panel">✕</button>
+    </div>
+    <div class="source-body" id="source-body"></div>
   </aside>
 </div>
 

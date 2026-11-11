@@ -102,9 +102,9 @@
   }
 
   /** Records an event. SSN/EIN patterns are masked before anything is stored. */
-  function log(type, detail) {
+  function log(type, detail, target) {
     var entry = { at: new Date().toISOString(), type: type, detail: redactDeep(detail || {}) };
-    var r = active();
+    var r = target || active();
     (r ? r.log : state.sessionLog).push(entry);
     renderLogCount();
     return entry;
@@ -128,7 +128,12 @@
       step: 'documents',
       messages: [],
       files: [],
+      docs: [],
       items: [],
+      docSeq: 0,
+      itemSeq: 0,
+      acked: false,
+      busy: false,
       counts: { high: 0, medium: 0, low: 0 },
       log: [],
       status: 'Simple or complex: pending your answers',
@@ -138,6 +143,7 @@
     state.returns.unshift(r);
     state.activeId = r.id;
     state.pending = [];
+    state.panel = null;
     var ai = TRP.ai.getStatus();
     log('return.created', { name: r.name, mode: ai.connected ? 'AI-assisted (' + ai.model + ')' : 'manual entry' });
     seedWelcome(r, ai);
@@ -186,9 +192,10 @@
   var QUESTION_HANDLERS = {
     'synthetic-ack': function (r, value) {
       if (value === 'yes') {
+        r.acked = true;
         say(r, [
           { type: 'p', text: 'Thanks. That is recorded in the session log.' },
-          { type: 'p', text: "Start by dropping the trustee's year-end documents here, or use the paperclip. Reading them is built in the next milestone, so this is as far as the conversation goes in this build." }
+          { type: 'p', text: "Start by dropping the trustee's year-end documents here, or use the paperclip: 1099-INT, 1099-DIV, 1099-B and the distribution and expense summary." }
         ]);
       } else {
         r.blocked = true;
@@ -259,6 +266,15 @@
             b.items.forEach(function (t) { list.appendChild(el('li', {}, t)); });
             node.appendChild(list);
           } else if (b.type === 'question') node.appendChild(renderQuestion(r, b.q));
+          else if (b.type === 'table') node.appendChild(renderTable(r, b.itemIds));
+          else if (b.type === 'status') node.appendChild(el('p', { class: 'status-line', role: 'status' }, b.text));
+          else if (b.type === 'actions') {
+            var row = el('div', { class: 'btn-row' });
+            b.actions.forEach(function (a) {
+              row.appendChild(el('button', { type: 'button', class: 'btn btn-outline', onclick: a.run }, a.label));
+            });
+            node.appendChild(row);
+          }
         });
       }
       box.appendChild(node);
@@ -287,7 +303,7 @@
   function renderComposer() {
     var r = active();
     var input = $('#composer-input');
-    var blocked = !r || r.blocked;
+    var blocked = !r || r.blocked || r.busy;
     var chips = $('#pending-files');
     chips.textContent = '';
     state.pending.forEach(function (f, i) {
@@ -300,7 +316,7 @@
     });
     input.disabled = blocked;
     $('#file-input').disabled = !!r && r.blocked;
-    input.placeholder = blocked ? 'Return closed. Start a new one.' : 'Type an answer or drop documents here';
+    input.placeholder = r && r.busy ? 'Reading documents…' : blocked ? 'Return closed. Start a new one.' : 'Type an answer or drop documents here';
     $('#send-btn').disabled = blocked || (!input.value.trim() && !state.pending.length);
   }
 
@@ -314,26 +330,503 @@
     var input = $('#composer-input');
     var text = input.value.trim();
     var files = state.pending.slice();
-    if (!r || r.blocked || (!text && !files.length)) return;
+    if (!r || r.blocked || r.busy || (!text && !files.length)) return;
+    if (!r.acked) {
+      say(r, 'Please answer the question above first. This tool is for synthetic data only.');
+      renderAll();
+      return;
+    }
+
+    var known = {};
+    r.docs.forEach(function (d) { known[d.name + '|' + d.size] = true; });
+    var fresh = files.filter(function (f) { return !known[f.name + '|' + f.size]; });
+    var skipped = files.filter(function (f) { return known[f.name + '|' + f.size]; });
 
     userSays(r, text, files.map(function (f) { return f.name; }));
-    if (files.length) {
-      files.forEach(function (f) { r.files.push(f); });
-      log('documents.uploaded', { files: files.map(function (f) { return { name: f.name, bytes: f.size, type: f.type || 'unknown' }; }) });
-      say(r, 'Received ' + files.length + (files.length === 1 ? ' file' : ' files') +
-        ". They are held in this tab's memory only. Classification and extraction are built in a later milestone, so nothing has been read yet.");
+    if (text) log('message', { text: text });
+    if (skipped.length) {
+      say(r, skipped.map(function (f) { return f.name; }).join(', ') + (skipped.length === 1 ? ' is' : ' are') + ' already in this return, so I skipped ' + (skipped.length === 1 ? 'it.' : 'them.'));
     }
-    if (text) {
-      log('message', { text: text });
-      if (!files.length) {
-        say(r, 'This build is the interface shell. Document reading and the trust questions that will respond here are built next. Nothing you typed was sent to an AI model.');
-      }
+    if (fresh.length) {
+      log('documents.uploaded', { files: fresh.map(function (f) { return { name: f.name, bytes: f.size, type: f.type || 'unknown' }; }) });
+      processFiles(r, fresh);
+    } else if (text && !skipped.length) {
+      say(r, 'Questions about the return are answered in a later milestone. Nothing you typed was sent to an AI model.');
     }
     state.pending = [];
     input.value = '';
     autoGrow(input);
     renderAll();
     input.focus();
+  }
+
+  /* ---------- IRS excerpts: the only text the app may cite ---------- */
+
+  TRP.knowledge = { byId: {}, loaded: false };
+
+  function loadKnowledge() {
+    return fetch('knowledge/irs_excerpts.json').then(function (res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function (data) {
+      data.excerpts.forEach(function (e) { TRP.knowledge.byId[e.id] = e; });
+      TRP.knowledge.loaded = true;
+      // Every source id used in code must exist in the excerpts file.
+      var missing = [];
+      Object.keys(TRP.extract.FORMS).forEach(function (formId) {
+        TRP.extract.FORMS[formId].fields.forEach(function (f) {
+          if (f.source && !TRP.knowledge.byId[f.source]) missing.push(f.id + ' -> ' + f.source);
+        });
+      });
+      log('knowledge.check', { excerpts: data.excerpts.length, missing: missing, result: missing.length ? 'fail' : 'pass' });
+    }).catch(function (err) {
+      log('knowledge.check', { result: 'fail', reason: 'Could not load the IRS excerpts: ' + err.message });
+    });
+  }
+
+  /** The excerpt behind a field, or null. A source id that is not in the file is never shown. */
+  function citation(fieldId) {
+    var f = TRP.extract.field(fieldId);
+    return f && f.source ? TRP.knowledge.byId[f.source] || null : null;
+  }
+
+  /* ---------- Documents, items and confidence ---------- */
+
+  function findItem(r, id) { return r.items.filter(function (i) { return i.id === id; })[0] || null; }
+  function findDoc(r, id) { return r.docs.filter(function (d) { return d.id === id; })[0] || null; }
+
+  function badge(level) {
+    var c = CONFIDENCE.filter(function (x) { return x.id === level; })[0];
+    return el('span', { class: 'badge badge-' + level }, el('span', { 'aria-hidden': 'true' }, c.symbol), ' ' + c.label);
+  }
+
+  function itemLabel(item) {
+    var f = TRP.extract.field(item.fieldId);
+    return (f.box ? 'Box ' + f.box + ' · ' : '') + f.label;
+  }
+  function itemAmount(item) { return TRP.extract.show(TRP.extract.field(item.fieldId), item.value); }
+
+  function recount(r) {
+    r.counts = { high: 0, medium: 0, low: 0 };
+    r.items.forEach(function (i) { r.counts[i.confidence]++; });
+  }
+
+  function addItems(r, doc, items) {
+    return items.map(function (it) {
+      it.id = 'i' + (++r.itemSeq);
+      it.docId = doc.id;
+      it.status = it.status || 'open';
+      it.startedLow = it.confidence === 'low';
+      r.items.push(it);
+      log('item.read', {
+        document: doc.name, item: itemLabel(it), value: itemAmount(it), confidence: it.confidence, reason: it.reason,
+        parser: it.parser ? it.parser.value : null, ai: it.ai ? it.ai.value : null, escalate: it.escalate || undefined
+      }, r);
+      return it.id;
+    });
+  }
+
+  async function processFiles(r, files) {
+    r.busy = true;
+    var status = { type: 'status', text: 'Reading documents…' };
+    var statusMsg = { id: 'm' + (++state.msgSeq), role: 'assistant', blocks: [status] };
+    r.messages.push(statusMsg);
+    var useAi = TRP.ai.getStatus().connected;
+    var docs = [], itemIds = [];
+
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      status.text = 'Reading ' + (i + 1) + ' of ' + files.length + ': ' + file.name + '…';
+      renderAll();
+      var res;
+      try { res = await TRP.extract.processFile(file, { useAi: useAi }); }
+      catch (err) {
+        res = { status: 'manual', reason: 'Something went wrong while reading this file', forms: [], typeLabel: 'Not read', pages: [], pdf: null, items: [],
+          events: [{ type: 'document.error', detail: { file: file.name, error: String(err && err.message || err) } }] };
+      }
+      var doc = {
+        id: 'd' + (++r.docSeq), name: file.name, size: file.size, file: file, status: res.status, reason: res.reason,
+        typeLabel: res.typeLabel, forms: res.forms, pdf: res.pdf, pages: res.pages
+      };
+      r.docs.push(doc);
+      r.files.push(file);
+      docs.push(doc);
+      res.events.forEach(function (e) { log(e.type, e.detail, r); });
+      itemIds = itemIds.concat(addItems(r, doc, res.items));
+      log('document.result', { file: doc.name, status: doc.status, type: doc.typeLabel, reason: doc.reason || undefined, items: res.items.length }, r);
+    }
+
+    r.messages.splice(r.messages.indexOf(statusMsg), 1);
+    say(r, resultBlocks(r, docs, itemIds, useAi));
+    r.busy = false;
+    if (r.items.length && r.step === 'documents') r.step = 'profile';
+    r.dirty = true;
+    recount(r);
+    renderAll();
+  }
+
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function resultBlocks(r, docs, itemIds, useAi) {
+    var read = docs.filter(function (d) { return d.status === 'read'; });
+    var manual = docs.filter(function (d) { return d.status === 'manual'; });
+    var held = docs.filter(function (d) { return d.status === 'held'; });
+    var blocks = [];
+
+    if (read.length) {
+      blocks.push({ type: 'p', text: 'I read ' + plural(read.length, 'document') + ' and found ' + plural(itemIds.length, 'amount') +
+        '. Each one shows where it came from and how sure I am. Select a row to see the source page.' });
+      blocks.push({ type: 'table', itemIds: itemIds });
+      if (!useAi) blocks.push({ type: 'p', text: 'No AI key is connected, so each value was read once, by the text parser. That is Medium at best. Confirm a value to raise it to High.' });
+    }
+
+    var escalated = itemIds.map(function (id) { return findItem(r, id); }).filter(function (it) { return it.escalate && it.value; });
+    if (escalated.length) {
+      blocks.push({ type: 'p', text: 'These are outside what this tool computes. They will go to the reviewer instead of onto the return:' });
+      blocks.push({ type: 'ul', items: escalated.map(function (it) {
+        return TRP.extract.FORMS[it.formId].short + ', ' + itemLabel(it) + ' (' + itemAmount(it) + '): ' + it.escalate + '.';
+      }) });
+    }
+
+    held.forEach(function (d) {
+      blocks.push({ type: 'p', text: d.name + ' looks like a ' + d.typeLabel + '. ' + d.reason + '.' });
+    });
+
+    if (manual.length) {
+      blocks.push({ type: 'p', text: "I couldn't read " + (manual.length === 1 ? 'this one' : 'these') + '. You can enter the values by hand:' });
+      blocks.push({ type: 'ul', items: manual.map(function (d) { return d.name + ': ' + d.reason + '.'; }) });
+      blocks.push({ type: 'actions', actions: manual.map(function (d) {
+        return { label: 'Enter values for ' + d.name, run: function () { openManual(d.id); } };
+      }) });
+    }
+
+    if (read.length) blocks.push({ type: 'p', text: "Next come the questions these documents can't answer. That step is built in the next milestone. You can keep adding documents." });
+    return blocks;
+  }
+
+  function renderTable(r, itemIds) {
+    var body = el('tbody', {});
+    itemIds.forEach(function (id) {
+      var item = findItem(r, id);
+      if (!item) return;
+      var doc = findDoc(r, item.docId);
+      var open = function () { openSource(item.id); };
+      body.appendChild(el('tr', { class: 'item-row', onclick: open },
+        el('td', { title: doc ? doc.name : '' }, TRP.extract.FORMS[item.formId].short),
+        el('td', {},
+          el('button', { type: 'button', class: 'link-btn', onclick: function (e) { e.stopPropagation(); open(); } }, itemLabel(item)),
+          item.escalate && item.value ? el('span', { class: 'flag' }, 'Escalate') : null),
+        el('td', { class: 'num' }, itemAmount(item)),
+        el('td', {}, badge(item.confidence), ' ', el('span', { class: 'reason' }, item.reason))));
+    });
+    return el('div', { class: 'table-wrap' },
+      el('table', { class: 'items-table' },
+        el('thead', {}, el('tr', {},
+          el('th', { scope: 'col' }, 'Document'), el('th', { scope: 'col' }, 'Item'),
+          el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Confidence'))),
+        body));
+  }
+
+  function renderGate() {
+    var r = active();
+    var low = r ? r.items.filter(function (i) { return i.startedLow; }) : [];
+    var done = low.filter(function (i) { return i.status !== 'open'; }).length;
+    $('#gate-label').textContent = done + ' of ' + low.length + ' low-confidence items resolved';
+    $('#gate-fill').style.width = (low.length ? Math.round(100 * done / low.length) : 0) + '%';
+    var bar = $('#view-review .progress-bar');
+    bar.setAttribute('aria-valuemax', String(low.length));
+    bar.setAttribute('aria-valuenow', String(done));
+  }
+
+  /* ---------- Confirm and edit ---------- */
+
+  function confirmItem(r, item) {
+    if (item.value === null) return;
+    log('item.confirmed', { document: findDoc(r, item.docId).name, item: itemLabel(item), value: itemAmount(item), was: item.confidence + ': ' + item.reason }, r);
+    item.status = 'confirmed';
+    item.confidence = 'high';
+    item.reason = 'Confirmed by you';
+    recount(r);
+    renderAll();
+  }
+
+  function editItem(r, item, value) {
+    var before = itemAmount(item);
+    item.value = value;
+    item.status = 'edited';
+    item.confidence = 'high';
+    item.reason = 'Entered by you';
+    log('item.override', { document: findDoc(r, item.docId).name, item: itemLabel(item), from: before, to: itemAmount(item) }, r);
+    recount(r);
+    state.panel.editing = false;
+    renderAll();
+  }
+
+  /** Reads a typed amount. Returns a number, or null if it is not a plain amount. */
+  function readAmount(text) {
+    var t = String(text).trim();
+    if (!/^-?\$?\s?\d[\d,]*(\.\d{1,2})?$/.test(t)) return null;
+    return parseFloat(t.replace(/[$,\s]/g, ''));
+  }
+
+  /* ---------- Source side panel ---------- */
+
+  function openSource(itemId) {
+    state.panel = { mode: 'source', itemId: itemId, editing: false };
+    renderPanel();
+    $('#source-close').focus();
+  }
+
+  function openManual(docId) {
+    var r = active();
+    if (!r || r.blocked) return;
+    if (!r.acked) { say(r, 'Please answer the question above first. This tool is for synthetic data only.'); renderAll(); return; }
+    state.panel = { mode: 'manual', docId: docId, formId: '1099-INT', error: '' };
+    renderPanel();
+    $('#source-close').focus();
+  }
+
+  function closePanel() { state.panel = null; renderPanel(); }
+
+  var panelToken = 0;
+
+  function renderPanel() {
+    var r = active();
+    var open = !!(state.panel && r && state.view === 'chat');
+    $('#source-panel').hidden = !open;
+    $('#progress').hidden = state.view !== 'chat' || open;
+    if (!open) return;
+    var body = $('#source-body');
+    body.textContent = '';
+    panelToken++;
+    if (state.panel.mode === 'manual') renderManual(r, body);
+    else renderSource(r, body);
+  }
+
+  function renderSource(r, body) {
+    var item = findItem(r, state.panel.itemId);
+    if (!item) { closePanel(); return; }
+    var doc = findDoc(r, item.docId);
+    var f = TRP.extract.field(item.fieldId);
+    var pageNum = item.parser ? item.parser.page : item.ai ? item.ai.page : 1;
+    $('#source-title').textContent = doc.name;
+
+    var reads = el('dl', { class: 'reads' });
+    if (item.manual) {
+      reads.appendChild(el('dt', {}, 'Entered by hand'));
+      reads.appendChild(el('dd', {}, 'No document read'));
+    } else {
+      reads.appendChild(el('dt', {}, 'Text parser'));
+      reads.appendChild(el('dd', {}, item.parser ? TRP.extract.show(f, item.parser.value) + ' on page ' + item.parser.page : 'Not found'));
+      reads.appendChild(el('dt', {}, 'AI'));
+      reads.appendChild(el('dd', {}, item.ai
+        ? TRP.extract.show(f, item.ai.value) + ', quoting “' + item.ai.quote + '” (' + (item.ai.quoteOk ? 'found on page ' + item.ai.page : item.ai.quoteProblem) + ')'
+        : 'No AI read'));
+    }
+
+    var cite = citation(item.fieldId);
+    var info = el('div', { class: 'source-item' },
+      el('p', { class: 'source-kicker' }, TRP.extract.FORMS[item.formId].title + (doc.pdf ? ' · page ' + pageNum : '')),
+      el('h3', {}, itemLabel(item)),
+      el('p', { class: 'source-amount' }, itemAmount(item)),
+      el('p', {}, badge(item.confidence), ' ', el('span', { class: 'reason' }, item.reason)),
+      reads,
+      item.escalate && item.value ? el('p', { class: 'escalate-note' }, 'Escalate to reviewer: ' + item.escalate + '.') : null,
+      cite
+        ? el('blockquote', { class: 'excerpt' }, cite.text, el('cite', {}, cite.source + ' · ' + cite.section))
+        : el('p', { class: 'fine' }, f.form === 'SUMMARY' ? "Source: the trustee's own summary. It is not an IRS document." : 'No IRS excerpt is bundled for this box.'));
+    body.appendChild(info);
+
+    // Confirm / Edit
+    if (state.panel.editing) {
+      var input, error = el('p', { class: 'form-error', role: 'alert' });
+      if (f.kind === 'term') {
+        input = el('select', { class: 'input', id: 'edit-value' },
+          el('option', { value: 'long', selected: item.value === 'long' }, 'Long-term'),
+          el('option', { value: 'short', selected: item.value === 'short' }, 'Short-term'));
+      } else {
+        input = el('input', { class: 'input', id: 'edit-value', type: 'text', inputmode: 'decimal', autocomplete: 'off',
+          value: item.value === null ? '' : String(item.value) });
+      }
+      var form = el('form', { class: 'edit-form', novalidate: true },
+        el('label', { class: 'field-label', for: 'edit-value' }, f.kind === 'term' ? 'Holding period' : 'Correct amount'),
+        input, error,
+        el('div', { class: 'btn-row' },
+          el('button', { type: 'submit', class: 'btn btn-primary' }, 'Save'),
+          el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { state.panel.editing = false; renderPanel(); } }, 'Cancel')));
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var value = f.kind === 'term' ? input.value : readAmount(input.value);
+        if (value === null) { error.textContent = 'Enter an amount such as 1,200.00.'; input.focus(); return; }
+        editItem(r, item, value);
+      });
+      body.appendChild(form);
+      input.focus();
+    } else {
+      body.appendChild(el('div', { class: 'btn-row' },
+        el('button', { type: 'button', class: 'btn btn-primary', disabled: item.value === null || item.status !== 'open',
+          onclick: function () { confirmItem(r, item); } },
+          item.status === 'open' ? (item.value === null ? 'Nothing to confirm' : 'Confirm ' + itemAmount(item)) : 'Confirmed'),
+        el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { state.panel.editing = true; renderPanel(); } },
+          item.value === null ? 'Enter value' : 'Edit')));
+    }
+
+    var rect = item.parser ? item.parser.rect : null;
+    var note = !doc.pdf ? (item.manual ? '' : 'There is no page to show for this document.')
+      : rect ? '' : 'No highlight is available for this value, because it was not located in the text layer.';
+    if (note) body.appendChild(el('p', { class: 'fine' }, note));
+    if (doc.pdf) drawPage(doc, pageNum, rect, body);
+  }
+
+  function drawPage(doc, pageNum, rect, body) {
+    var box = el('div', { class: 'page-view', tabindex: '0', role: 'group', 'aria-label': 'Source page. Scroll to see the rest of the page.' }, el('p', { class: 'fine' }, 'Loading page…'));
+    body.appendChild(box);
+    var token = panelToken;
+    doc.pdf.getPage(pageNum).then(function (page) {
+      var cssWidth = Math.max(260, box.clientWidth);
+      // Never smaller than about 115%, so the print stays readable; the box scrolls instead.
+      var view = page.getViewport({ scale: Math.max(cssWidth / page.getViewport({ scale: 1 }).width, 1.15) });
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var canvas = el('canvas', { class: 'page-canvas', role: 'img', 'aria-label': 'Page ' + pageNum + ' of ' + doc.name });
+      canvas.width = Math.floor(view.width * dpr);
+      canvas.height = Math.floor(view.height * dpr);
+      canvas.style.width = view.width + 'px';
+      canvas.style.height = view.height + 'px';
+      return page.render({
+        canvas: canvas, canvasContext: canvas.getContext('2d'), viewport: view,
+        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
+      }).promise.then(function () {
+        if (token !== panelToken) return;            // the panel moved on while this page was drawing
+        box.textContent = '';
+        box.appendChild(canvas);
+        if (!rect) return;
+        // PDF points -> CSS pixels, using the viewport's own matrix (handles rotated pages too).
+        var t = view.transform;
+        var at = function (x, y) { return [t[0] * x + t[2] * y + t[4], t[1] * x + t[3] * y + t[5]]; };
+        var p1 = at(rect.x - 3, rect.y - 3), p2 = at(rect.x + rect.w + 3, rect.y + rect.h + 1);
+        var q = [p1[0], p1[1], p2[0], p2[1]];
+        var mark = el('div', { class: 'highlight', 'aria-hidden': 'true' });
+        mark.style.left = Math.min(q[0], q[2]) + 'px';
+        mark.style.top = Math.min(q[1], q[3]) + 'px';
+        mark.style.width = Math.abs(q[2] - q[0]) + 'px';
+        mark.style.height = Math.abs(q[3] - q[1]) + 'px';
+        box.appendChild(mark);
+        box.scrollLeft = Math.min(q[0], q[2]) + Math.abs(q[2] - q[0]) / 2 - box.clientWidth / 2;
+        box.scrollTop = Math.min(q[1], q[3]) + Math.abs(q[3] - q[1]) / 2 - box.clientHeight / 2;
+      });
+    }).catch(function (err) {
+      console.warn('Page draw failed:', err);
+      if (token === panelToken) { box.textContent = ''; box.appendChild(el('p', { class: 'fine' }, 'This page could not be drawn.')); }
+    });
+  }
+
+  /* ---------- Manual entry (works with no AI and no readable document) ---------- */
+
+  function renderManual(r, body) {
+    var panel = state.panel;
+    var doc = panel.docId ? findDoc(r, panel.docId) : null;
+    var form = TRP.extract.FORMS[panel.formId];
+    $('#source-title').textContent = doc ? doc.name : 'Add a document by hand';
+
+    var typeSelect = el('select', { class: 'input', id: 'manual-type' });
+    Object.keys(TRP.extract.FORMS).forEach(function (id) {
+      typeSelect.appendChild(el('option', { value: id, selected: id === panel.formId }, TRP.extract.FORMS[id].title));
+    });
+    typeSelect.addEventListener('change', function () { panel.formId = typeSelect.value; panel.error = ''; renderPanel(); });
+
+    var main = el('div', { class: 'manual-fields' });
+    var other = el('div', { class: 'manual-fields' });
+    var inputs = {};
+    form.fields.forEach(function (f) {
+      if (f.use === 'check') return;
+      var id = 'manual-' + f.id, input;
+      if (f.kind === 'term') {
+        input = el('select', { class: 'input', id: id },
+          el('option', { value: '' }, 'Choose…'), el('option', { value: 'long' }, 'Long-term'), el('option', { value: 'short' }, 'Short-term'));
+      } else {
+        input = el('input', { class: 'input', id: id, type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: '0.00' });
+      }
+      inputs[f.id] = input;
+      (f.use === 'escalate' ? other : main).appendChild(
+        el('div', {}, el('label', { class: 'field-label', for: id }, (f.box ? 'Box ' + f.box + ' · ' : '') + f.label), input));
+    });
+
+    var error = el('p', { class: 'form-error', role: 'alert' }, panel.error);
+    var formEl = el('form', { class: 'manual-form', novalidate: true },
+      el('p', { class: 'muted' }, doc ? doc.reason + '. Type the values from the document. Leave a box empty if it is blank.'
+        : 'Type the values from the document. Leave a box empty if it is blank.'),
+      el('label', { class: 'field-label', for: 'manual-type' }, 'Document type'), typeSelect,
+      main,
+      other.childNodes.length ? el('details', {}, el('summary', {}, 'Other boxes (sent to the reviewer if not zero)'), other) : null,
+      error,
+      el('div', { class: 'btn-row' },
+        el('button', { type: 'submit', class: 'btn btn-primary' }, 'Save values'),
+        el('button', { type: 'button', class: 'btn btn-outline', onclick: closePanel }, 'Cancel')));
+
+    formEl.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var values = {}, bad = null;
+      form.fields.forEach(function (f) {
+        var input = inputs[f.id];
+        if (!input || bad || input.value.trim() === '') return;
+        var v = f.kind === 'term' ? input.value : readAmount(input.value);
+        if (v === null) bad = f; else values[f.id] = v;
+      });
+      if (bad) { error.textContent = 'Enter an amount such as 1,200.00 for ' + bad.label + '.'; inputs[bad.id].focus(); return; }
+      var problems = TRP.extract._validate(panel.formId, values);
+      if (problems.length) { error.textContent = 'Check failed: ' + problems[0].message + '. Correct the amounts and save again.'; return; }
+      var kept = form.fields.filter(function (f) { return f.id in values && (values[f.id] !== 0 || f.keepZero); });
+      if (!kept.length) { error.textContent = 'Enter at least one value.'; return; }
+
+      if (!doc) {
+        doc = { id: 'd' + (++r.docSeq), name: form.short + ' (entered by hand)', size: 0, file: null, pdf: null, pages: [], reason: '' };
+        r.docs.push(doc);
+      }
+      doc.status = 'read'; doc.forms = [panel.formId]; doc.typeLabel = form.short;
+      var ids = addItems(r, doc, kept.map(function (f) {
+        return { fieldId: f.id, formId: panel.formId, value: values[f.id], parser: null, ai: null, manual: true,
+          confidence: 'high', reason: 'Entered by you', status: 'edited', escalate: f.use === 'escalate' ? f.why : '' };
+      }));
+      log('document.manual', { document: doc.name, type: form.short, items: ids.length }, r);
+      say(r, [
+        { type: 'p', text: 'Added ' + plural(ids.length, 'value') + ' entered by hand from ' + doc.name + '.' },
+        { type: 'table', itemIds: ids }
+      ]);
+      if (r.step === 'documents') r.step = 'profile';
+      r.dirty = true;
+      recount(r);
+      state.panel = null;
+      renderAll();
+    });
+
+    body.appendChild(formEl);
+    if (doc && doc.pdf) drawPage(doc, 1, null, body);
+  }
+
+  /* ---------- Sample documents (synthetic) ---------- */
+
+  var SAMPLE = ['1099-INT_HarborRidgeBank.pdf', '1099-DIV_NorthfieldFunds.pdf', '1099-B_CalderBrokerage.pdf', 'Trust_summary.pdf'];
+
+  function loadSample() {
+    var msg = $('#sample-msg');
+    msg.textContent = 'Loading the sample documents…';
+    Promise.all(SAMPLE.map(function (name) {
+      return fetch('samples/case1/' + name).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.blob();
+      }).then(function (blob) { return new File([blob], name, { type: 'application/pdf' }); });
+    })).then(function (files) {
+      msg.textContent = '';
+      newReturn();
+      var r = active();
+      var q = r.messages[0].blocks.filter(function (b) { return b.type === 'question'; })[0].q;
+      answerQuestion(r, q, q.options[0]);            // the samples are synthetic by construction
+      userSays(r, 'Here are the sample documents for the Maple Street Trust.', SAMPLE);
+      log('documents.uploaded', { files: SAMPLE.map(function (n) { return { name: n, sample: true }; }) }, r);
+      processFiles(r, files);
+    }).catch(function () {
+      msg.textContent = 'The sample documents could not be loaded. Open the app from its web address, not from a file on disk.';
+    });
   }
 
   /* ---------- Sidebar, progress panel, log ---------- */
@@ -354,6 +847,7 @@
           onclick: function () {
             state.activeId = r.id;
             state.pending = [];
+            state.panel = null;
             setView('chat');
             closeDrawers();
             renderAll();
@@ -426,6 +920,7 @@
     $('#topbar-status').textContent = r ? (r.blocked ? 'Closed' : r.status) : '';
     $('#topbar-title').textContent = inReturn && r ? r.name : 'Trust Return Preparer';
     renderSidebar();
+    renderPanel();
   }
 
   function renderAll() {
@@ -434,6 +929,8 @@
     renderMessages();
     renderComposer();
     renderLogCount();
+    renderGate();
+    renderPanel();
   }
 
   /* ---------- API key UI (first-run card, settings, sidebar) ---------- */
@@ -601,6 +1098,9 @@
       addFiles(files);
     });
     $('#review-btn').addEventListener('click', function () { closeDrawers(); setView('review'); });
+    $('#manual-btn').addEventListener('click', function () { closeDrawers(); openManual(null); });
+    $('#source-close').addEventListener('click', closePanel);
+    $('#sample-btn').addEventListener('click', loadSample);
     $('#new-return-btn').addEventListener('click', function () { closeDrawers(); newReturn(); });
     $('#settings-btn').addEventListener('click', function () { openSettings(false); });
     $('#key-status-btn').addEventListener('click', function () { openSettings(true); });
@@ -609,7 +1109,11 @@
     $('#open-progress-btn').addEventListener('click', function (e) { openDrawer('progress', e.currentTarget); });
     $('#close-progress-btn').addEventListener('click', closeDrawers);
     $('#backdrop').addEventListener('click', closeDrawers);
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawers(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+      if ($('#sidebar').classList.contains('is-open') || $('#progress').classList.contains('is-open')) closeDrawers();
+      else if (state.panel) closePanel();
+    });
     $$('[data-goto]').forEach(function (btn) {
       btn.addEventListener('click', function () { setView(btn.getAttribute('data-goto')); });
     });
@@ -638,6 +1142,7 @@
 
     setView('first-run');
     renderAll();
+    loadKnowledge();
     TRP.ai.restore();
   }
 
