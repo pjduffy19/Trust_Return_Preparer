@@ -539,7 +539,9 @@
     var failed = calls.filter(function (e) { return e.detail.result === 'fail'; });
     var reasons = {};
     failed.forEach(function (e) { reasons[e.detail.reason] = true; });
-    return 'Read in ' + total + ' s. AI: ' + String(calls[0].detail.model).replace(/^models\//, '') + ', ' +
+    var models = [];
+    calls.forEach(function (e) { var m = String(e.detail.model).replace(/^models\//, ''); if (models.indexOf(m) === -1) models.push(m); });
+    return 'Read in ' + total + ' s. AI: ' + models.join(', then ') + ', ' +
       plural(calls.length, 'call') + ', slowest ' + Math.round(Math.max.apply(null, secs) * 10) / 10 + ' s' +
       (failed.length ? '; ' + failed.length + ' failed (' + Object.keys(reasons).join('; ') + ')' : '') + '.';
   }

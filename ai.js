@@ -11,7 +11,7 @@
   var TRP = (window.TRP = window.TRP || {});
 
   var KEY_STORE = 'trp-api-key';
-  var MODEL_STORE = 'trp-ai-model';
+  var MODEL_STORE = 'trp-ai-model-choice';   // set only when the user picks a model in Settings
   var PROVIDER_STORE = 'trp-ai-provider';
 
   /* ---------- PII redaction and masking ---------- */
@@ -115,57 +115,74 @@
           .map(function (m) { return { id: m.name, label: m.displayName || m.name }; });
       },
 
-      /** Picks a general-purpose "flash" model from the list rather than hard-coding a name. */
-      pickDefaultModel: function (models) {
-        var skip = /(preview|exp|lite|tts|image|live|audio|embedding|vision|thinking|learn)/i;
-        var version = function (m) {
-          var v = /gemini-(\d+(?:\.\d+)?)/i.exec(m.id);
-          return v ? parseFloat(v[1]) : 0;
+      /**
+       * Orders the key's models for reading documents: Flash-Lite first (fast, and it can keep its
+       * "thinking" to a minimum), then Flash, newest version first, stable before preview.
+       * Names are read from the key's own model list; nothing is hard-coded.
+       */
+      rankModels: function (models) {
+        var skip = /(tts|image|live|audio|embedding|vision|learn|exp|computer|robotics|native)/i;
+        var version = function (id) { var v = /gemini-(\d+(?:\.\d+)?)/i.exec(id); return v ? parseFloat(v[1]) : 0; };
+        var group = function (id) {
+          var lite = /flash-lite/i.test(id), flash = /flash/i.test(id), preview = /preview/i.test(id);
+          return lite && !preview ? 0 : flash && !lite && !preview ? 1 : lite ? 2 : flash ? 3 : 9;
         };
-        var pool = models.filter(function (m) { return /flash/i.test(m.id) && !skip.test(m.id); });
-        if (!pool.length) pool = models.filter(function (m) { return /flash/i.test(m.id); });
-        if (!pool.length) pool = models.slice();
-        pool.sort(function (a, b) { return version(b) - version(a); });
-        return pool.length ? pool[0].id : null;
+        return models.map(function (m) { return m.id; })
+          .filter(function (id) { return /gemini/i.test(id) && /flash/i.test(id) && !skip.test(id); })
+          .sort(function (a, b) { return group(a) - group(b) || version(b) - version(a) || a.length - b.length; });
       },
 
-      /** Models that rejected the request to skip "thinking". Copying numbers needs no reasoning. */
-      noThinkingControl: {},
+      /**
+       * How to ask each model for the least "thinking". Copying printed amounts needs none, and thinking
+       * is what makes replies slow. Gemini 2.5 takes a token budget; Gemini 3 and later take a level,
+       * and not every model accepts every level, so each is tried in turn and the first accepted is kept.
+       */
+      thinkingSteps: function (id) {
+        var v = /gemini-(\d+(?:\.\d+)?)/i.exec(id);
+        if (v && parseFloat(v[1]) < 3) return [{ thinkingBudget: 0 }, null];
+        return [{ thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, null];
+      },
+      thinkingIndex: {},
 
       generateJson: async function (opts) {
-        var body = {
-          contents: [{ role: 'user', parts: [{ text: opts.prompt }] }],
-          generationConfig: { temperature: 0, responseMimeType: 'application/json' }
-        };
-        if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
-        if (opts.providerSchema) body.generationConfig.responseSchema = opts.providerSchema;
-        // Gemini "thinking" models spend many seconds reasoning before they reply. Reading printed
-        // amounts needs none of it, so ask for no thinking, unless this model has refused that before.
-        var askedNoThinking = !this.noThinkingControl[opts.model];
-        if (askedNoThinking) body.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        var steps = this.thinkingSteps(opts.model);
+        for (;;) {
+          var idx = this.thinkingIndex[opts.model] || 0;
+          var thinking = steps[Math.min(idx, steps.length - 1)];
+          var body = {
+            contents: [{ role: 'user', parts: [{ text: opts.prompt }] }],
+            generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+          };
+          if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
+          if (opts.providerSchema) body.generationConfig.responseSchema = opts.providerSchema;
+          if (thinking) body.generationConfig.thinkingConfig = thinking;
 
-        var res = await fetch(this.base + '/' + opts.model + ':generateContent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.key },
-          body: JSON.stringify(body),
-          signal: opts.signal
-        });
-        var json = await res.json().catch(function () { return null; });
-        if (!res.ok && res.status === 400 && askedNoThinking && /thinking/i.test(JSON.stringify(json || ''))) {
-          this.noThinkingControl[opts.model] = true;      // this model must think; ask again without the setting
-          return this.generateJson(opts);
+          var res = await fetch(this.base + '/' + opts.model + ':generateContent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': opts.key },
+            body: JSON.stringify(body),
+            signal: opts.signal
+          });
+          var json = await res.json().catch(function () { return null; });
+          if (!res.ok && res.status === 400 && thinking && idx < steps.length - 1 && /think/i.test(JSON.stringify(json || ''))) {
+            this.thinkingIndex[opts.model] = idx + 1;      // this model refused that setting; try the next one
+            continue;
+          }
+          if (!res.ok) throw httpError(res, json);
+          if (!json) throw new SyntaxError('Empty reply');
+          var parts = (((json.candidates || [])[0] || {}).content || {}).parts || [];
+          return {
+            text: parts.filter(function (p) { return !p.thought; }).map(function (p) { return p.text || ''; }).join(''),
+            thinking: thinking ? JSON.stringify(thinking) : 'model default'
+          };
         }
-        if (!res.ok) throw httpError(res, json);
-        if (!json) throw new SyntaxError('Empty reply');
-        var parts = (((json.candidates || [])[0] || {}).content || {}).parts || [];
-        return parts.map(function (p) { return p.text || ''; }).join('');
       }
     }
   };
 
   /* ---------- Connection state (session only) ---------- */
 
-  var status = { state: 'disconnected', provider: 'gemini', model: null, models: [], message: 'No API key connected' };
+  var status = { state: 'disconnected', provider: 'gemini', model: null, models: [], ranked: [], message: 'No API key connected' };
   var listeners = [];
 
   function store(k, v) {
@@ -190,7 +207,8 @@
     if (err && (err.status === 400 || err.status === 401 || err.status === 403)) {
       return 'The provider rejected this key. Check that you copied the whole key.';
     }
-    if (err && err.status === 429) return 'The provider is rate-limiting this key. Wait a minute and try again.';
+    if (err && err.status === 429) return 'The provider is rate-limiting this key (429)';
+    if (err && (err.status === 503 || err.status === 500 || err.status === 502 || err.status === 504)) return 'The model is busy or unavailable (' + err.status + ')';
     if (err && err.status) return 'The provider returned an error (' + err.status + '). Try again.';
     return 'Could not reach the provider. Check your connection and try again.';
   }
@@ -208,12 +226,12 @@
     try {
       var models = await provider.listModels(key);
       if (!models.length) throw Object.assign(new Error('No usable models'), { status: 404 });
+      var ranked = provider.rankModels(models);
       var saved = read(MODEL_STORE);
-      var model = models.some(function (m) { return m.id === saved; }) ? saved : provider.pickDefaultModel(models);
+      var model = models.some(function (m) { return m.id === saved; }) ? saved : ranked[0] || models[0].id;
       store(KEY_STORE, key);
       store(PROVIDER_STORE, providerId);
-      store(MODEL_STORE, model);
-      setStatus({ state: 'connected', models: models, model: model, message: 'Connected to ' + provider.label });
+      setStatus({ state: 'connected', models: models, ranked: ranked, model: model, message: 'Connected to ' + provider.label });
       if (TRP.log) TRP.log('ai.connect', { provider: providerId, model: model, result: 'pass' });
     } catch (err) {
       store(KEY_STORE, null);
@@ -226,7 +244,7 @@
   function disconnect() {
     store(KEY_STORE, null);
     store(MODEL_STORE, null);
-    setStatus({ state: 'disconnected', models: [], model: null, message: 'No API key connected' });
+    setStatus({ state: 'disconnected', models: [], ranked: [], model: null, message: 'No API key connected' });
     if (TRP.log) TRP.log('ai.disconnect', {});
   }
 
@@ -250,7 +268,14 @@
    * Returns { ok: true, data } or { ok: false, manual: true, reason }.
    * `prompt` is redacted here, so callers cannot forget to do it.
    */
-  var TIMEOUT_MS = 45000;
+  var TIMEOUT_MS = 30000;        // one call
+  var BUDGET_MS = 75000;         // all attempts for one item, across fallback models
+  var REST_MS = 120000;          // how long a busy model is skipped
+  var resting = {};              // model id -> time it was found busy
+
+  function busyError(err, aborted) {
+    return aborted || (err && [429, 500, 502, 503, 504].indexOf(err.status) !== -1) || (err && !err.status && !(err instanceof SyntaxError));
+  }
 
   async function callJson(opts) {
     var key = read(KEY_STORE);
@@ -258,38 +283,55 @@
       return { ok: false, manual: true, reason: 'No AI connected' };
     }
     var provider = PROVIDERS[status.provider];
-    var request = {
-      key: key, model: status.model, system: opts.system,
-      prompt: redact(opts.prompt), providerSchema: opts.providerSchema
-    };
-    var lastReason = '';
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      var started = Date.now();
-      var controller = new AbortController();
-      var timer = setTimeout(function () { controller.abort(); }, TIMEOUT_MS);
-      request.signal = controller.signal;
-      var timedOut = false, rateLimited = false;
-      try {
-        var text = await provider.generateJson(request);
-        var data = JSON.parse(text);
-        var errors = validate(opts.schema, data);
-        if (!errors.length) {
-          clearTimeout(timer);
-          if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: status.model, attempt: attempt, seconds: (Date.now() - started) / 1000, result: 'pass', output: data });
-          return { ok: true, data: data };
+    var prompt = redact(opts.prompt);
+    var deadline = Date.now() + BUDGET_MS;
+    var now = Date.now();
+    var isResting = function (id) { return resting[id] && now - resting[id] < REST_MS; };
+    // The chosen model first, then the ranked list; models found busy in the last two minutes go last.
+    var order = [status.model].concat(status.ranked.filter(function (id) { return id !== status.model; }));
+    order = order.filter(function (id) { return !isResting(id); }).concat(order.filter(isResting)).slice(0, 3);
+
+    var lastReason = '', tried = [];
+    for (var m = 0; m < order.length; m++) {
+      var model = order[m];
+      for (var attempt = 1; attempt <= 2; attempt++) {
+        var left = deadline - Date.now();
+        if (left < 5000) break;
+        var started = Date.now();
+        var controller = new AbortController();
+        var limit = Math.min(TIMEOUT_MS, left);
+        var timer = setTimeout(function () { controller.abort(); }, limit);
+        var busy = false, fatal = false, thinking = '';
+        try {
+          var reply = await provider.generateJson({ key: key, model: model, system: opts.system, prompt: prompt, providerSchema: opts.providerSchema, signal: controller.signal });
+          thinking = reply.thinking;
+          var data = JSON.parse(reply.text);
+          var errors = validate(opts.schema, data);
+          if (!errors.length) {
+            clearTimeout(timer);
+            if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: model, thinking: thinking, attempt: attempt, seconds: (Date.now() - started) / 1000, result: 'pass', output: data });
+            if (model !== status.model) {
+              if (TRP.log) TRP.log('ai.fallback', { from: status.model, to: model, reason: lastReason });
+              setStatus({ model: model });
+            }
+            return { ok: true, data: data, model: model };
+          }
+          lastReason = 'Schema check failed: ' + errors.slice(0, 3).join('; ');
+        } catch (err) {
+          var aborted = controller.signal.aborted;
+          busy = busyError(err, aborted);
+          fatal = !busy && err && err.status >= 400 && err.status < 500;   // a bad key or request: another model will not help
+          lastReason = aborted ? 'The AI took longer than ' + Math.round(limit / 1000) + ' seconds'
+            : err instanceof SyntaxError ? 'Reply was not valid JSON' : explain(err);
         }
-        lastReason = 'Schema check failed: ' + errors.slice(0, 3).join('; ');
-      } catch (err) {
-        timedOut = controller.signal.aborted;
-        rateLimited = err && err.status === 429;
-        lastReason = timedOut ? 'The AI took longer than ' + TIMEOUT_MS / 1000 + ' seconds'
-          : err instanceof SyntaxError ? 'Reply was not valid JSON' : explain(err);
+        clearTimeout(timer);
+        if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: model, thinking: thinking || undefined, attempt: attempt, seconds: (Date.now() - started) / 1000, result: 'fail', reason: lastReason });
+        if (fatal) return { ok: false, manual: true, reason: lastReason, tried: tried.concat(model) };
+        if (busy) { resting[model] = Date.now(); break; }   // busy or slow: move on to the next model
       }
-      clearTimeout(timer);
-      if (TRP.log) TRP.log('ai.call', { purpose: opts.purpose, model: status.model, attempt: attempt, seconds: (Date.now() - started) / 1000, result: 'fail', reason: lastReason });
-      if (timedOut || rateLimited) break;  // a second wait would only double the delay
+      tried.push(model);
     }
-    return { ok: false, manual: true, reason: lastReason };
+    return { ok: false, manual: true, reason: lastReason, tried: tried };
   }
 
   TRP.ai = {
