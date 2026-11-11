@@ -48,6 +48,7 @@ Click any row to open the source page with the amount highlighted, then confirm 
 - The short-term or long-term box is read only when it is printed as text, such as "[X] Long-term". If it is not found, the item is Low and you choose it.
 - Descriptions and dates on Form 1099-B are not captured.
 - Scans and photos are not read at all; their values are typed in by hand.
+- On the source page, full SSNs and EINs found in the text layer are painted over, leaving the last 4 digits. Positions inside a run of text are estimated, so a mask can be a little wide or narrow. Scanned pages have no text layer, so they cannot be masked; the panel says so.
 
 ## Layout
 

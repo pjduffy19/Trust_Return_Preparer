@@ -546,6 +546,17 @@ a { color: var(--accent); }
 .manual-form details { border: 1px solid var(--border); border-radius: 10px; padding: 0 12px 12px; }
 .manual-form summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 500; }
 
+/* ---------- Rename and masking ---------- */
+.topbar-title { flex: 0 1 auto; }
+.rename-btn { width: 36px; height: 36px; color: var(--text-muted); margin-right: auto; }
+.rename-btn::after { content: ""; position: absolute; inset: -4px; }
+.rename-btn { position: relative; }
+.rename-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1; min-width: 0; margin-right: auto; }
+.rename-input { width: min(360px, 100%); min-height: 40px; }
+.btn-sm { min-height: 40px; padding: 0 12px; font-size: 14px; }
+.rename-form .form-error { flex-basis: 100%; }
+.mask-warning { font-size: 13px; color: var(--med-fg); background: var(--med-bg); border-radius: 8px; padding: 8px 10px; }
+
 /* ---------- Narrow screens: panel, then sidebar, become drawers ---------- */
 @media (max-width: 1180px) {
   .only-narrow-progress { display: inline-flex; }

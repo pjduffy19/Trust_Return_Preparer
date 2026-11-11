@@ -152,6 +152,45 @@
     $('#composer-input').focus();
   }
 
+  /** Renames a return. Names are shown everywhere, so they may not contain an SSN or EIN. */
+  function renameReturn(r, raw) {
+    var name = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!name) return 'Enter a name.';
+    if (TRP.ai.findTins(name).length) return 'A name cannot contain an SSN or EIN.';
+    if (name === r.name) return '';
+    log('return.renamed', { from: r.name, to: name }, r);
+    r.name = name;
+    r.named = true;
+    return '';
+  }
+  TRP.renameReturn = renameReturn;
+
+  function startRename() {
+    var r = active();
+    if (!r) return;
+    var title = $('#topbar-title');
+    var input = el('input', { class: 'input rename-input', id: 'rename-input', type: 'text', maxlength: '80', autocomplete: 'off', value: r.name, 'aria-describedby': 'rename-error' });
+    var error = el('span', { class: 'form-error', id: 'rename-error', role: 'alert' });
+    var form = el('form', { class: 'rename-form', novalidate: true },
+      el('label', { class: 'sr-only', for: 'rename-input' }, 'Trust name'), input,
+      el('button', { type: 'submit', class: 'btn btn-primary btn-sm' }, 'Save'),
+      el('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: finish }, 'Cancel'), error);
+    function finish() { form.remove(); title.hidden = false; $('#rename-btn').hidden = false; setView(state.view); $('#rename-btn').focus(); }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var problem = renameReturn(r, input.value);
+      if (problem) { error.textContent = problem; input.focus(); return; }
+      finish();
+      renderAll();
+    });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); finish(); } });
+    title.hidden = true;
+    $('#rename-btn').hidden = true;
+    title.parentNode.insertBefore(form, title.nextSibling);
+    input.focus();
+    input.select();
+  }
+
   function seedWelcome(r, ai) {
     say(r, [
       { type: 'p', text: "I'll help you prepare a draft Form 1041 for a simple or complex trust, tax year 2025. Here's how it works:" },
@@ -260,7 +299,7 @@
       } else {
         node = el('div', { class: 'msg msg-assistant' }, el('span', { class: 'sr-only' }, 'Trust Return Preparer: '));
         m.blocks.forEach(function (b) {
-          if (b.type === 'p') node.appendChild(el('p', {}, b.text));
+          if (b.type === 'p') node.appendChild(el('p', { class: b.small ? 'fine' : null }, b.text));
           else if (b.type === 'ol' || b.type === 'ul') {
             var list = el(b.type, {});
             b.items.forEach(function (t) { list.appendChild(el('li', {}, t)); });
@@ -436,6 +475,7 @@
 
     // Read up to three files at once. Results are added in upload order once all are back.
     var results = new Array(files.length), done = 0, next = 0, started = Date.now();
+    var logStart = r.log.length;
     function showProgress() {
       var secs = Math.round((Date.now() - started) / 1000);
       status.text = 'Reading ' + plural(files.length, 'document') + (useAi ? ' with the AI' : '') + ': ' +
@@ -478,7 +518,9 @@
     });
 
     r.messages.splice(r.messages.indexOf(statusMsg), 1);
-    say(r, resultBlocks(r, docs, itemIds, useAi));
+    var blocks = resultBlocks(r, docs, itemIds, useAi);
+    blocks.push({ type: 'p', text: timingNote(r, logStart, started, useAi), small: true });
+    say(r, blocks);
     r.busy = false;
     if (r.items.length && r.step === 'documents') r.step = 'profile';
     r.dirty = true;
@@ -487,6 +529,20 @@
   }
 
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  /** One line on where the time went, so slow reads can be diagnosed from the screen. */
+  function timingNote(r, logStart, started, useAi) {
+    var total = Math.round((Date.now() - started) / 100) / 10;
+    var calls = r.log.slice(logStart).filter(function (e) { return e.type === 'ai.call'; });
+    if (!useAi || !calls.length) return 'Read in ' + total + ' s' + (useAi ? '. No AI calls were made.' : ' without AI.');
+    var secs = calls.map(function (e) { return e.detail.seconds || 0; });
+    var failed = calls.filter(function (e) { return e.detail.result === 'fail'; });
+    var reasons = {};
+    failed.forEach(function (e) { reasons[e.detail.reason] = true; });
+    return 'Read in ' + total + ' s. AI: ' + String(calls[0].detail.model).replace(/^models\//, '') + ', ' +
+      plural(calls.length, 'call') + ', slowest ' + Math.round(Math.max.apply(null, secs) * 10) / 10 + ' s' +
+      (failed.length ? '; ' + failed.length + ' failed (' + Object.keys(reasons).join('; ') + ')' : '') + '.';
+  }
 
   function resultBlocks(r, docs, itemIds, useAi) {
     var read = docs.filter(function (d) { return d.status === 'read'; });
@@ -718,12 +774,17 @@
         transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
       }).promise.then(function () {
         if (token !== panelToken) return;            // the panel moved on while this page was drawing
-        box.textContent = '';
-        box.appendChild(canvas);
-        if (!rect) return;
         // PDF points -> CSS pixels, using the viewport's own matrix (handles rotated pages too).
         var t = view.transform;
         var at = function (x, y) { return [t[0] * x + t[2] * y + t[4], t[1] * x + t[3] * y + t[5]]; };
+        var masked = maskTins(canvas, dpr, at, doc.pages[pageNum - 1]);
+        box.textContent = '';
+        box.appendChild(canvas);
+        var hasText = doc.pages[pageNum - 1] && doc.pages[pageNum - 1].lines.length;
+        var note = !hasText ? 'This page is an image, so SSNs and EINs on it cannot be found and masked. Use synthetic documents only.'
+          : masked ? plural(masked, 'identifying number') + ' masked on this page. Only the last 4 digits are shown.' : '';
+        if (note) box.parentNode.insertBefore(el('p', { class: hasText ? 'fine' : 'mask-warning' }, note), box);
+        if (!rect) return;
         var p1 = at(rect.x - 3, rect.y - 3), p2 = at(rect.x + rect.w + 3, rect.y + rect.h + 1);
         var q = [p1[0], p1[1], p2[0], p2[1]];
         var mark = el('div', { class: 'highlight', 'aria-hidden': 'true' });
@@ -739,6 +800,38 @@
       console.warn('Page draw failed:', err);
       if (token === panelToken) { box.textContent = ''; box.appendChild(el('p', { class: 'fine' }, 'This page could not be drawn.')); }
     });
+  }
+
+  /**
+   * Paints over every full SSN, ITIN or EIN found in the page's text layer, leaving the last
+   * 4 digits, so the page shown on screen never displays a full identifying number.
+   * Positions inside a text run are estimated from character counts.
+   */
+  function maskTins(canvas, dpr, at, page) {
+    if (!page) return 0;
+    var ctx = canvas.getContext('2d'), count = 0;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    page.lines.forEach(function (line) {
+      line.items.forEach(function (it) {
+        TRP.ai.findTins(it.str).forEach(function (hit) {
+          var len = it.str.length || 1;
+          var x0 = it.x + it.w * hit.index / len, x1 = it.x + it.w * (hit.index + hit.length) / len;
+          var a = at(x0 - 1, line.y - 2), b = at(x1 + 1, line.y + it.h + 1);
+          var left = Math.min(a[0], b[0]), top = Math.min(a[1], b[1]);
+          var w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]);
+          ctx.fillStyle = '#E3E3DF';
+          ctx.fillRect(left, top, w, h);
+          ctx.fillStyle = '#1A1A1A';
+          ctx.font = Math.max(8, Math.round(h * 0.72)) + 'px Inter, system-ui, sans-serif';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(TRP.ai.maskTin(hit.text, hit.kind), left + 2, top + h / 2, w - 4);
+          count++;
+        });
+      });
+    });
+    ctx.restore();
+    return count;
   }
 
   /* ---------- Manual entry (works with no AI and no readable document) ---------- */
@@ -940,6 +1033,7 @@
     $('#topbar-status').hidden = !inReturn;
     $('#topbar-status').textContent = r ? (r.blocked ? 'Closed' : r.status) : '';
     $('#topbar-title').textContent = inReturn && r ? r.name : 'Trust Return Preparer';
+    $('#rename-btn').hidden = !inReturn || !!$('.rename-form');
     renderSidebar();
     renderPanel();
   }
@@ -1119,6 +1213,7 @@
       addFiles(files);
     });
     $('#review-btn').addEventListener('click', function () { closeDrawers(); setView('review'); });
+    $('#rename-btn').addEventListener('click', startRename);
     $('#manual-btn').addEventListener('click', function () { closeDrawers(); openManual(null); });
     $('#source-close').addEventListener('click', closePanel);
     $('#sample-btn').addEventListener('click', loadSample);

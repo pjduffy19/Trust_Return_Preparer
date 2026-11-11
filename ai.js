@@ -32,6 +32,19 @@
     return out;
   }
 
+  /** Full SSNs, ITINs and EINs in a string, with their positions. Already-truncated numbers are left alone. */
+  function findTins(text) {
+    var found = [], s = String(text == null ? '' : text);
+    TIN_PATTERNS.slice(0, 3).forEach(function (re, i) {
+      var g = new RegExp(re.source, 'g'), m;
+      while ((m = g.exec(s))) {
+        var overlaps = found.some(function (f) { return m.index < f.index + f.length && f.index < m.index + m[0].length; });
+        if (!overlaps) found.push({ index: m.index, length: m[0].length, kind: i === 1 ? 'ein' : 'ssn', text: m[0] });
+      }
+    });
+    return found;
+  }
+
   /** Mask an SSN or EIN for display: only the last 4 digits are shown. */
   function maskTin(value, kind) {
     var digits = String(value == null ? '' : value).replace(/\D/g, '');
@@ -289,6 +302,7 @@
     onStatus: function (fn) { listeners.push(fn); },
     callJson: callJson,
     redact: redact,
+    findTins: findTins,
     maskTin: maskTin,
     validate: validate
   };
