@@ -481,6 +481,8 @@
     return { a: a, facts: docFacts(r), pii: r.pii };
   }
   TRP.ctxOf = ctxOf;
+  /** The engine input for a return, built from its items and answers. */
+  TRP.engineInput = function (r) { var ctx = ctxOf(r); return TRP.engine.inputFrom(r.items, ctx.a, ctx.facts); };
   TRP.pendingQuestion = function () { var r = active(); return r ? pendingQuestion(r) : null; };
 
   function pendingQuestion(r) {

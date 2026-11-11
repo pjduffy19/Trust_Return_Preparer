@@ -343,6 +343,132 @@
    "file": "sources/i1041_2025.pdf",
    "section": "Other Information, digital assets, page 40",
    "text": "You have a financial interest in a digital asset if you are the owner of record of a digital asset, or have an ownership stake in an account that holds one or more digital assets, including the rights and obligations to acquire a financial interest, or you own a wallet that holds digital assets."
+  },
+  {
+   "id": "i1041-rate-schedule",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "2025 Tax Rate Schedule, page 33",
+   "text": "For tax years beginning in 2025, figure the tax using the following Tax Rate Schedule and enter the tax on line 1a."
+  },
+  {
+   "id": "i1041-capgain-rates",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Capital gains and qualified dividends, page 2",
+   "text": "For tax year 2025, the 20% maximum capital gains rate applies to estates and trusts with income above $15,900. The 0% and 15% rates apply to certain threshold amounts. The 0% rate applies to amounts up to $3,250. The 15% rate applies to amounts over $3,250 and up to $15,900."
+  },
+  {
+   "id": "i1041-exemption",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Line 21—Exemption, page 29",
+   "text": "A trust whose governing instrument requires that all income be distributed currently is allowed a $300 exemption, even if it distributed amounts other than income during the tax year. […] A trust not described above is allowed a $100 exemption."
+  },
+  {
+   "id": "i1041-niit",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Net Investment Income Tax (NIIT), page 38",
+   "text": "The NIIT is imposed on estates and trusts to the extent that they have undistributed NII and AGI exceeding $15,650."
+  },
+  {
+   "id": "i1041-line-2b",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Line 2b—Qualified Dividends, page 21",
+   "text": "Enter the beneficiary’s allocable share of qualified dividends on line 2b(1) and enter the estate’s or trust’s allocable share on line 2b(2). […] Don’t reduce the amounts on line 2b by any other allocable expenses."
+  },
+  {
+   "id": "i1041-schb-line2",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule B, Line 2—Adjusted Tax-Exempt Interest, page 32",
+   "text": "Step 1. Add tax-exempt interest income on line 2 of Schedule A, any expenses allowable under section 212 allocable to tax-exempt interest, and any interest expense allocable to tax-exempt interest. Step 2. Subtract the Step 1 total from the amount of tax-exempt interest (including exempt-interest dividends) received."
+  },
+  {
+   "id": "i1041-schb-line3",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule B, Line 3, page 32",
+   "text": "Include all capital gains, whether or not distributed, that are attributable to income under the governing instrument or local law."
+  },
+  {
+   "id": "i1041-schb-line9",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule B, Line 9—Income Required To Be Distributed Currently, page 32",
+   "text": "Line 9 is to be completed by all simple trusts as well as complex trusts and decedents’ estates that are required to distribute income currently, whether it is distributed or not."
+  },
+  {
+   "id": "i1041-schb-line10",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule B, Line 10—Other Amounts Paid, Credited, or Otherwise Required To Be Distributed, page 32",
+   "text": "Line 10 is to be completed only by a decedent’s estate or complex trust. These distributions consist of any other amounts paid, credited, or required to be distributed and are referred to as “second-tier distributions.”"
+  },
+  {
+   "id": "i1041-schb-line12",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule B, Line 12—Adjustment for Tax-Exempt Income, page 33",
+   "text": "If tax-exempt interest is the only tax-exempt income included in the total distributions (line 11), and the DNI (line 7) is less than or equal to line 11, then enter on line 12 the amount from line 2. If tax-exempt interest is the only tax-exempt income included in the total distributions (line 11), and the DNI (line 7) is more than line 11 (that is, the estate or trust made a distribution that is less than the DNI), then figure the adjustment by multiplying line 2 by a fraction, the numerator of which is the total distributions (line 11), and the denominator of which is the DNI (line 7)."
+  },
+  {
+   "id": "f1041-page1-totals",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Lines 9, 17 and 23, page 1",
+   "text": "Total income. Combine lines 1, 2a, and 3 through 8 · Adjusted total income or (loss). Subtract line 16 from line 9 · Taxable income. Subtract line 22 from line 17."
+  },
+  {
+   "id": "f1041-schb",
+   "source": "Form 1041 (2025)",
+   "file": "sources/f1041_2025.pdf",
+   "section": "Schedule B, page 2",
+   "text": "Enter any gain from page 1, line 4, as a negative number. · Distributable net income. Combine lines 1 through 6. If zero or less, enter -0- · Tentative income distribution deduction. Subtract line 12 from line 11 · Tentative income distribution deduction. Subtract line 2 from line 7. If zero or less, enter -0- · Income distribution deduction. Enter the smaller of line 13 or line 14 here and on page 1, line 18"
+  },
+  {
+   "id": "f1041sd-summary",
+   "source": "Schedule D (Form 1041) (2025)",
+   "file": "sources/f1041sd_2025.pdf",
+   "section": "Parts III and IV, page 2",
+   "text": "If line 19, column (3), is a net gain, enter the gain on Form 1041, line 4 · The loss on line 19, column (3); or b $3,000"
+  },
+  {
+   "id": "f1041sd-part5",
+   "source": "Schedule D (Form 1041) (2025)",
+   "file": "sources/f1041sd_2025.pdf",
+   "section": "Part V, Tax Computation Using Maximum Capital Gains Rates, page 2",
+   "text": "Enter the smaller of the amount on line 21 or $3,250 · Enter the smaller of line 21 or $15,900 · Multiply line 36 by 15% (0.15) · Multiply line 40 by 20% (0.20) · Tax on all taxable income. Enter the smaller of line 43 or line 44 here and on Form 1041, Schedule"
+  },
+  {
+   "id": "f1041sd-carryover",
+   "source": "Schedule D (Form 1041) (2025)",
+   "file": "sources/f1041sd_2025.pdf",
+   "section": "Lines 6 and 15, page 1",
+   "text": "Short-term capital loss carryover. Enter the amount, if any, from line 9 of the 2024 Capital Loss · Long-term capital loss carryover. Enter the amount, if any, from line 14 of the 2024 Capital Loss"
+  },
+  {
+   "id": "i1041-k1-boxes",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule K-1, Boxes 1, 2a and 2b, page 45",
+   "text": "Enter the beneficiary’s share of the taxable interest income minus allocable deductions. · Enter the beneficiary’s share of ordinary dividends minus allocable deductions. · Enter the beneficiary’s share of qualified dividends minus allocable deductions."
+  },
+  {
+   "id": "i1041-k1-allocation",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule K-1, Allocation of deductions, page 44",
+   "text": "Second, deductions that aren’t directly attributable to a specific class of income may generally be allocated to any class of income, as long as a reasonable portion is allocated to any tax-exempt income."
+  },
+  {
+   "id": "i1041-character",
+   "source": "Instructions for Form 1041 (2025)",
+   "file": "sources/i1041_2025.pdf",
+   "section": "Schedule K-1, Character of income, page 44",
+   "text": "The beneficiary’s income is considered to have the same proportion of each class of items entering into the computation of DNI that the total of each class has to the DNI"
   }
  ]
 }

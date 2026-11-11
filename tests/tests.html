@@ -3,12 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tests – Trust Return Preparer</title>
-<link rel="stylesheet" href="../styles.css">
+<title>Rules engine tests – Trust Return Preparer</title>
+<script>try { var t = localStorage.getItem('trp-theme'); if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}</script>
+<link rel="stylesheet" href="../styles.css?v=20261111f">
+<style>
+  body { height: auto; }
+  .tests { max-width: 900px; margin: 0 auto; padding: 32px 20px 64px; display: flex; flex-direction: column; gap: 16px; }
+  .tests h1 { font-size: 26px; }
+  .tests h2 { font-size: 18px; margin-top: 12px; }
+  .total { font-size: 17px; font-weight: 600; }
+  td.path { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-muted); }
+</style>
 </head>
-<body style="padding:32px;max-width:820px;margin:0 auto">
-<h1>Rules engine tests</h1>
-<p class="muted">The test runner and the seven synthetic cases are added in Milestones 4 and 5. Nothing runs yet.</p>
-<p><a href="../index.html">Back to the app</a></p>
+<body>
+<main class="tests">
+  <p><a href="../index.html">← Back to the app</a></p>
+  <h1>Rules engine tests</h1>
+  <p class="muted">Synthetic cases run through <code>rules/engine.js</code> in your browser. Case 1's expected figures come from the build specification; the others were worked out by hand from the 2025 forms and instructions. No AI is involved.</p>
+  <p class="total" id="total" role="status">Running…</p>
+  <div id="cases"></div>
+</main>
+<script src="../rules/constants_2025.js?v=20261111f"></script>
+<script src="../rules/engine.js?v=20261111f"></script>
+<script src="cases.js?v=20261111f"></script>
+<script>
+(function () {
+  function el(tag, attrs, text) {
+    var n = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function show(v) { return typeof v === 'number' ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(v); }
+  var passed = 0, total = 0, box = document.getElementById('cases');
+  window.TRP.runTests().forEach(function (c) {
+    var ok = c.rows.every(function (r) { return r.pass; });
+    box.appendChild(el('h2', {}, c.id + ': ' + c.title + (ok ? '' : ' (failing)')));
+    box.appendChild(el('p', { class: 'muted' }, c.about));
+    var wrap = el('div', { class: 'table-wrap' }), table = el('table', { class: 'items-table' }), head = el('tr');
+    ['Check', 'Expected', 'Engine', 'Result'].forEach(function (h, i) { head.appendChild(el('th', { scope: 'col', class: i === 1 || i === 2 ? 'num' : '' }, h)); });
+    var thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    var body = el('tbody');
+    c.rows.forEach(function (r) {
+      total++; if (r.pass) passed++;
+      var tr = el('tr');
+      var first = el('td', {}, r.label); first.appendChild(el('br')); first.appendChild(el('span', { class: 'path' }, r.path));
+      tr.appendChild(first);
+      tr.appendChild(el('td', { class: 'num' }, show(r.expected)));
+      tr.appendChild(el('td', { class: 'num' }, show(r.actual)));
+      var cell = el('td'), badge = el('span', { class: 'badge ' + (r.pass ? 'badge-high' : 'badge-low') }, r.pass ? '● Pass' : '○ Fail');
+      cell.appendChild(badge); tr.appendChild(cell);
+      body.appendChild(tr);
+    });
+    table.appendChild(body); wrap.appendChild(table); box.appendChild(wrap);
+  });
+  document.getElementById('total').textContent = passed + ' of ' + total + ' checks passed' + (passed === total ? '.' : '. See the failing rows below.');
+})();
+</script>
 </body>
 </html>

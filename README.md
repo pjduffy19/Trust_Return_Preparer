@@ -17,7 +17,7 @@ To use AI-assisted intake, paste your own Google Gemini API key on the first scr
 | 1 | Repo skeleton, UI shell (light/dark), API key handling, session-only state | Built |
 | 2 | Document upload, two-method extraction, validations, confidence, source panel | Built |
 | 3 | Trust profile questions, simple/complex classification, out-of-scope refusal, prior-year flow | Built |
-| 4 | Rules engine, cited constants, test cases 1–4 | Not started |
+| 4 | Rules engine, cited constants, test cases 1–4 | Built |
 | 5 | Review gate, escalations, test cases 5–7 | Not started |
 | 6 | PDF field mapping and filling, review log export, reviewer sign-off | Not started |
 | 7 | Full README, known limitations, boundary check | Not started |
@@ -44,6 +44,20 @@ After the documents are read, the app asks what they cannot answer, one question
 - **Not sure** is always allowed. It becomes a Low item for the reviewer, never a guess. Elections and anything outside the rules are escalated.
 
 SSNs and EINs are typed into masked boxes, kept in memory for the final PDF only, and never logged or sent to the AI.
+
+## The calculation
+
+`rules/engine.js` computes the return in form order, with no AI: Schedule D, page 1 income and deductions, Schedule B (distributable net income and the income distribution deduction), the exemption, taxable income, the tax on Schedule G line 1a, and each beneficiary's Schedule K-1 amounts. Every step is recorded with the IRS excerpt it applies. The calculation is not yet shown in the app; that comes with the review gate.
+
+- **Constants** are in `rules/constants_2025.js`, each copied from the IRS PDFs with its page number: the 2025 tax rate schedule, the capital gain breakpoints, the exemptions, the capital loss limit and the NIIT threshold.
+- **Tax** uses Schedule D Part V (or the Qualified Dividends Tax Worksheet) when there are capital gains or qualified dividends kept by the trust, and the rate schedule otherwise.
+- **Method choices** are listed as assumptions for the reviewer: expenses go to tax-exempt income in proportion to gross accounting income; other deductions are spread over interest and dividends in proportion; qualified dividends follow the share of DNI distributed.
+- **Refusals.** The engine will not compute when the classification, the capital gain allocation or the fee allocation is undecided, when there are charitable amounts (Schedule A), or for a complex trust with gains allocated to income.
+- **Not computed:** Net Investment Income Tax (flagged when taxable income is above the threshold), alternative minimum tax, credits, estimated tax payments and next year's capital loss carryover.
+
+## Tests
+
+Open `tests/tests.html` on the site, or run `node tests/run.js`. Cases 1 to 4, plus the engine parts of cases 5 and 7 and a check of the rate schedule, are compared with figures worked out by hand.
 
 ## Sample documents
 
@@ -74,8 +88,8 @@ app.js                UI, chat flow, session state
 ai.js                 provider adapter, schema validation, SSN/EIN redaction
 extract.js            document reading: classify, parse, AI read, checks, confidence
 profile.js            trust profile questions, classification rule, scope and reviewer flags
-rules/engine.js       deterministic tax calculations (stub)
-rules/constants_2025.js   2025 constants, each cited to the instructions (stub)
+rules/engine.js       deterministic tax calculations
+rules/constants_2025.js   2025 constants, each cited to its IRS page
 pdf/fill.js           fills the IRS PDFs (stub)
 pdf/field_map_2025.json   return line -> PDF field name (stub)
 knowledge/irs_excerpts.json   the only text the app may cite
@@ -83,7 +97,7 @@ samples/              synthetic test documents
 scripts/make_samples.py   regenerates the samples
 scripts/check_excerpts.py verifies every excerpt appears in its source PDF
 sources/              IRS PDFs
-tests/tests.html      rules-engine test runner (stub)
+tests/tests.html      rules-engine test page (tests/cases.js holds the cases; tests/run.js runs them in Node)
 ```
 
 ## Sources
