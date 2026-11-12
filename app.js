@@ -1022,7 +1022,11 @@
 
   /** Any change to an input makes an earlier result stale. */
   function invalidate(r) {
-    if (r.result) { r.result = null; log('return.stale', { reason: 'An input changed after the return was generated' }, r); }
+    if (r.result) {
+      r.result = null; r.outputs = null;
+      log('return.stale', { reason: 'An input changed after the return was generated' }, r);
+      if (r.signoff) { log('review.signoff.cleared', { reason: 'The return changed after sign-off', was: r.signoff.decision }, r); r.signoff = null; }
+    }
     if (r.step === 'generate') r.step = 'review';
   }
 
@@ -1165,6 +1169,8 @@
     var g = gate(r);
     if (!g.canGenerate) return;
     r.result = g.engine;
+    r.outputs = null;
+    r.signoff = null;
     r.step = 'generate';
     var F = r.result.form;
     log('return.generated', {
@@ -1173,7 +1179,7 @@
       assumptions: r.result.assumptions, escalated: escalations(r, g), checks: r.result.checks
     }, r);
     say(r, [{ type: 'p', text: 'The return is calculated: taxable income ' + TRP.extract.formatMoney(F['23']) + ', total tax ' + TRP.extract.formatMoney(F['24']) + '. It is a draft for professional review.' },
-      { type: 'actions', actions: [{ label: 'Open the result', run: function () { setView('complete'); } }] }]);
+      { type: 'actions', actions: [{ label: 'Open the result and downloads', run: function () { setView('complete'); } }] }]);
     setView('complete');
     renderAll();
   }
@@ -1246,8 +1252,167 @@
     }
     listSection('Method choices the reviewer should check', res.assumptions);
     listSection('Escalated to the reviewer', esc);
-    box.appendChild(el('p', { class: 'fine' }, 'The filled IRS forms, the review log export and the reviewer sign-off are built in the next milestone.'));
+    renderOutputs(r, box);
+    renderSignoff(r, box);
   }
+
+  /* ---------- Downloads, review log export and reviewer sign-off ---------- */
+
+  function saveBytes(bytes, name, mime) {
+    var url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    var a = el('a', { href: url, download: name });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  }
+
+  /** Builds the filled IRS PDFs for the current result. Cached until the result changes. */
+  function buildForms(r) {
+    if (!r.outputs) {
+      var ctx = ctxOf(r);
+      r.outputs = TRP.pdfFill.forms(r.result, ctx.a, r.pii, { escalated: escalations(r, null).length }).then(function (out) {
+        log('output.built', { files: out.files.map(function (f) { return f.name; }), notes: out.notes }, r);
+        return out;
+      }).catch(function (err) { r.outputs = null; throw err; });
+    }
+    return r.outputs;
+  }
+
+  function logExport(r) {
+    var ctx = ctxOf(r), F = r.result ? r.result.form : null;
+    return {
+      app: 'Trust Return Preparer', status: TRP.pdfFill.DRAFT, exportedAt: new Date().toISOString(), taxYear: TRP.profile.YEAR,
+      return: { name: r.name, ein: ctx.a.ein || null, classification: ctx.a.classification || null },
+      result: F ? { totalIncome: F['9'], adjustedTotalIncome: F['17'], distributableNetIncome: r.result.schB['7'], incomeDistributionDeduction: F['18'],
+        exemption: F['21'], taxableIncome: F['23'], totalTax: F['24'], taxMethod: r.result.taxMethod, assumptions: r.result.assumptions, trace: r.result.trace } : null,
+      escalated: escalations(r, null), signoff: r.signoff || null, events: currentLog()
+    };
+  }
+
+  function logSections(r) {
+    var data = logExport(r), money = TRP.extract.formatMoney, sections = [];
+    sections.push({ title: 'Return', lines: ['Trust: ' + data.return.name, 'EIN: ' + (data.return.ein || 'not entered'), 'Type for ' + data.taxYear + ': ' + (data.return.classification || 'not decided'),
+      'Exported: ' + new Date(data.exportedAt).toLocaleString()] });
+    if (data.result) {
+      sections.push({ title: 'Result', lines: ['Total income: ' + money(data.result.totalIncome), 'Adjusted total income: ' + money(data.result.adjustedTotalIncome),
+        'Distributable net income: ' + money(data.result.distributableNetIncome), 'Income distribution deduction: ' + money(data.result.incomeDistributionDeduction),
+        'Exemption: ' + money(data.result.exemption), 'Taxable income: ' + money(data.result.taxableIncome), 'Total tax: ' + money(data.result.totalTax) + ' (' + data.result.taxMethod + ')'] });
+      sections.push({ title: 'How each line was computed', lines: data.result.trace.map(function (t) {
+        var cite = TRP.knowledge.byId[t.source];
+        return t.form + ' ' + t.line + ', ' + t.label + ': ' + (typeof t.value === 'number' ? money(t.value) : t.value) + '. ' + t.how + (cite ? ' [' + cite.source + ', ' + cite.section + ']' : '');
+      }) });
+      if (data.result.assumptions.length) sections.push({ title: 'Method choices', lines: data.result.assumptions });
+    }
+    sections.push({ title: 'Escalated to the reviewer', lines: data.escalated.length ? data.escalated : ['None'] });
+    sections.push({ title: 'Reviewer sign-off', lines: data.signoff
+      ? [data.signoff.decision + ' by ' + data.signoff.name + ' on ' + new Date(data.signoff.at).toLocaleString(), data.signoff.comments ? 'Comments: ' + data.signoff.comments : 'No comments']
+      : ['Not signed off'] });
+    sections.push({ title: 'Events (' + data.events.length + ')', lines: data.events.map(function (e) {
+      return new Date(e.at).toLocaleTimeString() + '  ' + e.type + '  ' + JSON.stringify(e.detail);
+    }) });
+    return sections;
+  }
+
+  function logFiles(r) {
+    var base = 'Review_log_2025_DRAFT_' + r.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    var json = new TextEncoder().encode(JSON.stringify(logExport(r), null, 2));
+    return TRP.pdfFill.logPdf('Review log: ' + r.name, 'Trust Return Preparer, tax year ' + TRP.profile.YEAR + '. SSNs and EINs are masked.', logSections(r)).then(function (pdf) {
+      return [{ id: 'log_pdf', name: base + '.pdf', bytes: pdf, mime: 'application/pdf' }, { id: 'log_json', name: base + '.json', bytes: json, mime: 'application/json' }];
+    });
+  }
+
+  /** Runs one download, showing progress on the button and any error beneath the cards. */
+  function download(r, btn, what, work) {
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Preparing…';
+    r.outputError = '';
+    work().then(function (files) {
+      files.forEach(function (f) { saveBytes(f.bytes, f.name, f.mime || 'application/pdf'); });
+      log('output.downloaded', { what: what, files: files.map(function (f) { return f.name; }) }, r);
+      renderLogCount();
+    }).catch(function (err) {
+      r.outputError = 'That download could not be prepared: ' + (err && err.message ? err.message : err) + '.';
+      log('output.error', { what: what, error: String(err && err.message || err) }, r);
+    }).then(function () {
+      btn.disabled = false; btn.textContent = label;
+      var node = $('#output-error'); if (node) node.textContent = r.outputError || '';
+    });
+  }
+
+  function renderOutputs(r, box) {
+    var res = r.result, hasD = !!TRP.pdfFill.values(res, ctxOf(r).a, r.pii).f1041sd;
+    function card(title, sub, buttons) {
+      var row = el('div', { class: 'btn-row' });
+      buttons.forEach(function (b) {
+        var btn = el('button', { type: 'button', class: 'btn btn-outline' }, b[0]);
+        btn.addEventListener('click', function () { download(r, btn, b[1], b[2]); });
+        row.appendChild(btn);
+      });
+      return el('div', { class: 'card download-card' }, el('h3', {}, title), el('p', { class: 'muted' }, sub), row);
+    }
+    function pick(test) { return function () { return buildForms(r).then(function (o) { return o.files.filter(test); }); }; }
+
+    box.appendChild(el('h3', {}, 'Downloads'));
+    var grid = el('div', { class: 'download-grid' });
+    grid.appendChild(card('Form 1041', 'Official IRS form, with Schedules B and G', [['Download', 'Form 1041', pick(function (f) { return f.id === 'f1041'; })]]));
+    grid.appendChild(card('Schedule K-1s', 'One per beneficiary: ' + res.k1.map(function (k) { return k.name; }).join(', '),
+      res.k1.map(function (k, i) { return [res.k1.length > 1 ? k.name : 'Download', 'Schedule K-1 ' + (i + 1), pick(function (f) { return f.id === 'k1_' + i; })]; })));
+    if (hasD) grid.appendChild(card('Schedule D', 'Capital gains and losses', [['Download', 'Schedule D', pick(function (f) { return f.id === 'f1041sd'; })]]));
+    grid.appendChild(card('Review log', 'Every event in this return, with SSNs and EINs masked', [
+      ['PDF', 'Review log PDF', function () { return logFiles(r).then(function (f) { return [f[0]]; }); }],
+      ['JSON', 'Review log JSON', function () { return logFiles(r).then(function (f) { return [f[1]]; }); }]]));
+    box.appendChild(grid);
+    var all = el('button', { type: 'button', class: 'btn btn-primary' }, 'Download all (.zip)');
+    all.addEventListener('click', function () {
+      download(r, all, 'All files (zip)', function () {
+        return Promise.all([buildForms(r), logFiles(r)]).then(function (parts) {
+          var files = parts[0].files.concat(parts[1]);
+          return [{ name: 'Trust_return_2025_DRAFT_' + r.name.replace(/[^A-Za-z0-9]+/g, '_') + '.zip', bytes: TRP.pdfFill.zip(files), mime: 'application/zip' }];
+        });
+      });
+    });
+    box.appendChild(el('div', { class: 'btn-row' }, all));
+    box.appendChild(el('p', { class: 'form-error', id: 'output-error', role: 'alert' }, r.outputError || ''));
+    box.appendChild(el('p', { class: 'fine' }, 'The downloaded forms carry the full EIN and identifying numbers you entered. Every page is stamped as a draft. Nothing is filed with the IRS or sent to anyone.'));
+  }
+
+  function renderSignoff(r, box) {
+    box.appendChild(el('h3', {}, 'Reviewer sign-off'));
+    if (r.signoff) {
+      box.appendChild(el('div', { class: 'card signoff' },
+        el('p', {}, el('strong', {}, r.signoff.decision), ' by ' + r.signoff.name + ' on ' + new Date(r.signoff.at).toLocaleString()),
+        r.signoff.comments ? el('p', {}, 'Comments: ' + r.signoff.comments) : null,
+        el('p', { class: 'fine' }, 'Recorded in the review log. Download the log again to include it.'),
+        el('div', { class: 'btn-row' }, reviewButton('Change sign-off', function () {
+          log('review.signoff.reopened', { was: r.signoff.decision, by: r.signoff.name }, r);
+          r.signoff = null; renderAll();
+        }))));
+      return;
+    }
+    var d = r.signoffDraft = r.signoffDraft || {};
+    var name = el('input', { class: 'input', id: 'reviewer-name', type: 'text', autocomplete: 'off', maxlength: '80', value: d.name || '' });
+    var comments = el('textarea', { class: 'input', id: 'reviewer-comments', rows: '3', maxlength: '1000' }, d.comments || '');
+    var error = el('p', { class: 'form-error', role: 'alert' });
+    name.addEventListener('input', function () { d.name = name.value; });
+    comments.addEventListener('input', function () { d.comments = comments.value; });
+    function sign(decision) {
+      var n = name.value.replace(/\s+/g, ' ').trim(), c = comments.value.trim();
+      if (!n) { error.textContent = "Enter the reviewer's name."; name.focus(); return; }
+      if (decision !== 'Approved' && !c) { error.textContent = 'Add comments so the preparer knows what to change.'; comments.focus(); return; }
+      if (TRP.ai.findTins(n + ' ' + c).length) { error.textContent = 'Do not type an SSN or EIN here.'; return; }
+      r.signoff = { name: n, decision: decision, comments: c, at: new Date().toISOString() };
+      r.signoffDraft = {};
+      log('review.signoff', { reviewer: n, decision: decision, comments: c || undefined, totalTax: r.result.form['24'], escalated: escalations(r, null).length }, r);
+      renderAll();
+    }
+    box.appendChild(el('div', { class: 'card signoff' },
+      el('p', { class: 'muted' }, 'For the reviewer, not the preparer. Approving records that a person has reviewed this draft; it does not file anything.'),
+      el('label', { class: 'field-label', for: 'reviewer-name' }, 'Reviewer name'), name,
+      el('label', { class: 'field-label', for: 'reviewer-comments' }, 'Comments'), comments, error,
+      el('div', { class: 'btn-row' }, reviewButton('Approve', function () { sign('Approved'); }, true), reviewButton('Return with comments', function () { sign('Returned with comments'); }))));
+  }
+
 
   /* ---------- Confirm and edit ---------- */
 

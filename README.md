@@ -19,7 +19,7 @@ To use AI-assisted intake, paste your own Google Gemini API key on the first scr
 | 3 | Trust profile questions, simple/complex classification, out-of-scope refusal, prior-year flow | Built |
 | 4 | Rules engine, cited constants, test cases 1–4 | Built |
 | 5 | Review gate, escalations, test cases 5–7 | Built |
-| 6 | PDF field mapping and filling, review log export, reviewer sign-off | Not started |
+| 6 | PDF field mapping and filling, review log export, reviewer sign-off | Built |
 | 7 | Full README, known limitations, boundary check | Not started |
 
 ## How documents are read
@@ -64,6 +64,19 @@ The review screen lists every Low item as a card with Confirm, Edit, View source
 
 Generating shows the key lines, each with its amount, a confidence that is the lowest of its inputs, and the rule it came from, plus the Schedule K-1 amounts, the method choices and everything escalated to the reviewer. Changing any input afterwards marks the result stale and it must be generated again.
 
+## Output
+
+After generating, the result screen offers:
+
+- **Form 1041** (with Schedules B and G and the Other Information answers), **Schedule D** when there are sales, capital gain distributions or carryovers, and **one Schedule K-1 per beneficiary**. These are the official IRS fillable PDFs from `sources/`, filled in the browser with pdf-lib and stamped as drafts on every page.
+- **The review log**, as a readable PDF and as JSON: the result, how each line was computed with its IRS source, method choices, escalations, the sign-off and every event. SSNs and EINs are masked in it.
+- **Download all** as one `.zip`.
+- **Reviewer sign-off**: name, Approve or Return with comments. It is recorded in the log and cleared if the return changes afterwards.
+
+**The field map.** The IRS PDFs have no tooltips on their fields, so each field was identified by the text printed beside it on the form. `scripts/list_fields.py` lists every field; `scripts/build_field_map.py` resolves each return line to a field, refuses to continue if a field is not found, and writes `pdf/field_map_2025.json` plus a readable `pdf/FIELD_MAP.md` for review. No field name is guessed.
+
+Left blank on purpose: payments and tax due (lines 25 to 30), the election boxes (Other Information 6 and 7), the foreign country name, the qualified opportunity fund question on Schedule D, and item H on Schedule K-1.
+
 ## Tests
 
 Open `tests/tests.html` on the site, or run `node tests/run.js`. Cases 1 to 4, plus the engine parts of cases 5 and 7 and a check of the rate schedule, are compared with figures worked out by hand.
@@ -99,12 +112,13 @@ extract.js            document reading: classify, parse, AI read, checks, confid
 profile.js            trust profile questions, classification rule, scope and reviewer flags
 rules/engine.js       deterministic tax calculations
 rules/constants_2025.js   2025 constants, each cited to its IRS page
-pdf/fill.js           fills the IRS PDFs (stub)
-pdf/field_map_2025.json   return line -> PDF field name (stub)
+pdf/fill.js           fills the IRS PDFs, builds the review log PDF and the zip
+pdf/field_map_2025.json   return line -> PDF field name (pdf/FIELD_MAP.md is the readable copy; pdf/fields/ lists every field)
 knowledge/irs_excerpts.json   the only text the app may cite
 samples/              synthetic test documents
 scripts/make_samples.py   regenerates the samples
 scripts/check_excerpts.py verifies every excerpt appears in its source PDF
+scripts/list_fields.py and build_field_map.py   build the field map from the IRS PDFs
 sources/              IRS PDFs
 tests/tests.html      rules-engine test page (tests/cases.js holds the cases; tests/run.js runs them in Node)
 ```

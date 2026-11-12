@@ -1,6 +1,1459 @@
 {
-  "_status": "Not built yet. Milestone 6 generates this from the AcroForm field names and tooltips in the IRS PDFs in /sources. No field names are guessed.",
-  "form1041": {},
-  "scheduleD": {},
-  "scheduleK1": {}
+ "_about": "Return line -> IRS PDF field. Built by scripts/build_field_map.py from pdf/fields/*.json. 'printed' is the text beside the field on the form.",
+ "f1041": {
+  "file": "sources/f1041_2025.pdf",
+  "fields": {
+   "trust_name": {
+    "field": "topmostSubform[0].Page1[0].DateNameAddress_ReadOrder[0].f1_4[0]",
+    "type": "text",
+    "label": "Name of estate or trust",
+    "page": 1,
+    "printed": {
+     "left": "Simple trust",
+     "above": "Name of estate or trust (If a",
+     "right": ""
+    }
+   },
+   "fiduciary": {
+    "field": "topmostSubform[0].Page1[0].DateNameAddress_ReadOrder[0].f1_5[0]",
+    "type": "text",
+    "label": "Name and title of fiduciary",
+    "page": 1,
+    "printed": {
+     "left": "Qualified disability trust",
+     "above": "Name and title of fiduciary",
+     "right": ""
+    }
+   },
+   "street": {
+    "field": "topmostSubform[0].Page1[0].DateNameAddress_ReadOrder[0].f1_6[0]",
+    "type": "text",
+    "label": "Number and street",
+    "page": 1,
+    "printed": {
+     "left": "Grantor type trust",
+     "above": "Number and street (If a P.O. box,",
+     "right": "See instructions."
+    }
+   },
+   "city": {
+    "field": "topmostSubform[0].Page1[0].DateNameAddress_ReadOrder[0].f1_8[0]",
+    "type": "text",
+    "label": "City or town",
+    "page": 1,
+    "printed": {
+     "left": "Pooled income fund",
+     "above": "City or town",
+     "right": ""
+    }
+   },
+   "state": {
+    "field": "topmostSubform[0].Page1[0].DateNameAddress_ReadOrder[0].f1_9[0]",
+    "type": "text",
+    "label": "State",
+    "page": 1,
+    "printed": {
+     "left": "Pooled income fund",
+     "above": "State or province",
+     "right": ""
+    }
+   },
+   "zip": {
+    "field": "topmostSubform[0].Page1[0].DateNameAddress_ReadOrder[0].f1_11[0]",
+    "type": "text",
+    "label": "ZIP code",
+    "page": 1,
+    "printed": {
+     "left": "Pooled income fund",
+     "above": "ZIP or foreign postal code",
+     "right": "Described in sec. 4947(a)(2)"
+    }
+   },
+   "entity_simple": {
+    "field": "topmostSubform[0].Page1[0].LinesA-B[0].c1_2[0]",
+    "type": "checkbox",
+    "label": "A: Simple trust",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "",
+     "right": "Simple trust"
+    }
+   },
+   "entity_complex": {
+    "field": "topmostSubform[0].Page1[0].LinesA-B[0].c1_3[0]",
+    "type": "checkbox",
+    "label": "A: Complex trust",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "",
+     "right": "Complex trust Name"
+    }
+   },
+   "k1_count": {
+    "field": "topmostSubform[0].Page1[0].LinesA-B[0].f1_12[0]",
+    "type": "text",
+    "label": "B: Number of Schedules K-1 attached",
+    "page": 1,
+    "printed": {
+     "left": "instructions)",
+     "above": "K-1",
+     "right": "boxes: Change in trust’s"
+    }
+   },
+   "ein": {
+    "field": "topmostSubform[0].Page1[0].LinesC-E[0].f1_13[0]",
+    "type": "text",
+    "label": "C: Employer identification number",
+    "page": 1,
+    "printed": {
+     "left": "Simple trust",
+     "above": "C Employer identification number",
+     "right": ""
+    }
+   },
+   "date_created": {
+    "field": "topmostSubform[0].Page1[0].LinesC-E[0].f1_14[0]",
+    "type": "text",
+    "label": "D: Date entity created",
+    "page": 1,
+    "printed": {
+     "left": "Qualified disability trust",
+     "above": "Date entity created D",
+     "right": ""
+    }
+   },
+   "initial_return": {
+    "field": "topmostSubform[0].Page1[0].c1_13[0]",
+    "type": "checkbox",
+    "label": "F: Initial return",
+    "page": 1,
+    "printed": {
+     "left": "B Number of Schedules K-1 F Check",
+     "above": "",
+     "right": "Initial return Final"
+    }
+   },
+   "final_return": {
+    "field": "topmostSubform[0].Page1[0].c1_14[0]",
+    "type": "checkbox",
+    "label": "F: Final return",
+    "page": 1,
+    "printed": {
+     "left": "Number of Schedules K-1 F Check Initial return",
+     "above": "",
+     "right": "Final return Amended"
+    }
+   },
+   "amended_return": {
+    "field": "topmostSubform[0].Page1[0].c1_15[0]",
+    "type": "checkbox",
+    "label": "F: Amended return",
+    "page": 1,
+    "printed": {
+     "left": "Schedules K-1 F Check Initial return Final return",
+     "above": "",
+     "right": "Amended return Net"
+    }
+   },
+   "change_name": {
+    "field": "topmostSubform[0].Page1[0].c1_17[0]",
+    "type": "checkbox",
+    "label": "F: Change in trust's name",
+    "page": 1,
+    "printed": {
+     "left": "instructions) boxes:",
+     "above": "",
+     "right": "Change in trust’s name Change"
+    }
+   },
+   "change_fiduciary": {
+    "field": "topmostSubform[0].Page1[0].c1_18[0]",
+    "type": "checkbox",
+    "label": "F: Change in fiduciary",
+    "page": 1,
+    "printed": {
+     "left": "instructions) boxes: Change in trust’s name",
+     "above": "",
+     "right": "Change in fiduciary Change"
+    }
+   },
+   "change_fiduciary_name": {
+    "field": "topmostSubform[0].Page1[0].c1_19[0]",
+    "type": "checkbox",
+    "label": "F: Change in fiduciary's name",
+    "page": 1,
+    "printed": {
+     "left": "boxes: Change in trust’s name Change in fiduciary",
+     "above": "",
+     "right": "Change in fiduciary’s name Change"
+    }
+   },
+   "change_fiduciary_address": {
+    "field": "topmostSubform[0].Page1[0].c1_20[0]",
+    "type": "checkbox",
+    "label": "F: Change in fiduciary's address",
+    "page": 1,
+    "printed": {
+     "left": "name Change in fiduciary Change in fiduciary’s name",
+     "above": "",
+     "right": "Change in fiduciary’s address"
+    }
+   },
+   "line_1": {
+    "field": "topmostSubform[0].Page1[0].f1_16[0]",
+    "type": "text",
+    "label": "Line 1: Interest income",
+    "page": 1,
+    "printed": {
+     "left": "1 Interest income 1",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_2a": {
+    "field": "topmostSubform[0].Page1[0].f1_17[0]",
+    "type": "text",
+    "label": "Line 2a: Total ordinary dividends",
+    "page": 1,
+    "printed": {
+     "left": "2a Total ordinary dividends 2a",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_2b1": {
+    "field": "topmostSubform[0].Page1[0].f1_18[0]",
+    "type": "text",
+    "label": "Line 2b(1): Qualified dividends, beneficiaries",
+    "page": 1,
+    "printed": {
+     "left": "b Qualified dividends allocable to: (1) Beneficiaries",
+     "above": ". . . . . .",
+     "right": "(2) Estate or trust"
+    }
+   },
+   "line_2b2": {
+    "field": "topmostSubform[0].Page1[0].f1_19[0]",
+    "type": "text",
+    "label": "Line 2b(2): Qualified dividends, estate or trust",
+    "page": 1,
+    "printed": {
+     "left": "allocable to: (1) Beneficiaries (2) Estate or trust",
+     "above": ". . . . . .",
+     "right": ""
+    }
+   },
+   "line_4": {
+    "field": "topmostSubform[0].Page1[0].f1_21[0]",
+    "type": "text",
+    "label": "Line 4: Capital gain or (loss)",
+    "page": 1,
+    "printed": {
+     "left": "or (loss). Attach Schedule D (Form 1041) 4",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_9": {
+    "field": "topmostSubform[0].Page1[0].f1_27[0]",
+    "type": "text",
+    "label": "Line 9: Total income",
+    "page": 1,
+    "printed": {
+     "left": "lines 1, 2a, and 3 through 8 9",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_12": {
+    "field": "topmostSubform[0].Page1[0].f1_30[0]",
+    "type": "text",
+    "label": "Line 12: Fiduciary fees",
+    "page": 1,
+    "printed": {
+     "left": "is deductible under section 67(e), see instructions 12",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_14": {
+    "field": "topmostSubform[0].Page1[0].f1_32[0]",
+    "type": "text",
+    "label": "Line 14: Attorney, accountant, and return preparer fees",
+    "page": 1,
+    "printed": {
+     "left": "see instructions 14",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_16": {
+    "field": "topmostSubform[0].Page1[0].f1_35[0]",
+    "type": "text",
+    "label": "Line 16: Add lines 10 through 15b",
+    "page": 1,
+    "printed": {
+     "left": "16 Add lines 10 through 15b 16",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_17": {
+    "field": "topmostSubform[0].Page1[0].f1_36[0]",
+    "type": "text",
+    "label": "Line 17: Adjusted total income",
+    "page": 1,
+    "printed": {
+     "left": "(loss). Subtract line 16 from line 9 17",
+     "above": ". . . . . .",
+     "right": ""
+    }
+   },
+   "line_18": {
+    "field": "topmostSubform[0].Page1[0].f1_37[0]",
+    "type": "text",
+    "label": "Line 18: Income distribution deduction",
+    "page": 1,
+    "printed": {
+     "left": "line 15). Attach Schedules K-1 (Form 1041) 18",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_21": {
+    "field": "topmostSubform[0].Page1[0].f1_40[0]",
+    "type": "text",
+    "label": "Line 21: Exemption",
+    "page": 1,
+    "printed": {
+     "left": "21 Exemption 21",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_22": {
+    "field": "topmostSubform[0].Page1[0].f1_41[0]",
+    "type": "text",
+    "label": "Line 22: Add lines 18 through 21",
+    "page": 1,
+    "printed": {
+     "left": "22 Add lines 18 through 21 22",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_23": {
+    "field": "topmostSubform[0].Page1[0].f1_42[0]",
+    "type": "text",
+    "label": "Line 23: Taxable income",
+    "page": 1,
+    "printed": {
+     "left": "line 17. If a loss, see instructions 23",
+     "above": "",
+     "right": ""
+    }
+   },
+   "line_24": {
+    "field": "topmostSubform[0].Page1[0].f1_43[0]",
+    "type": "text",
+    "label": "Line 24: Total tax",
+    "page": 1,
+    "printed": {
+     "left": "(from Schedule G, Part I, line 9) 24",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_1": {
+    "field": "topmostSubform[0].Page2[0].f2_8[0]",
+    "type": "text",
+    "label": "Schedule B line 1",
+    "page": 2,
+    "printed": {
+     "left": "1 Adjusted total income. See instructions 1",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_2": {
+    "field": "topmostSubform[0].Page2[0].f2_9[0]",
+    "type": "text",
+    "label": "Schedule B line 2",
+    "page": 2,
+    "printed": {
+     "left": "2 Adjusted tax-exempt interest 2",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_3": {
+    "field": "topmostSubform[0].Page2[0].f2_10[0]",
+    "type": "text",
+    "label": "Schedule B line 3",
+    "page": 2,
+    "printed": {
+     "left": "1041), line 19, column (1). See instructions 3",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_6": {
+    "field": "topmostSubform[0].Page2[0].f2_13[0]",
+    "type": "text",
+    "label": "Schedule B line 6",
+    "page": 2,
+    "printed": {
+     "left": "positive number 6",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_7": {
+    "field": "topmostSubform[0].Page2[0].f2_14[0]",
+    "type": "text",
+    "label": "Schedule B line 7: Distributable net income",
+    "page": 2,
+    "printed": {
+     "left": "6. If zero or less, enter -0- 7",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_8": {
+    "field": "topmostSubform[0].Page2[0].f2_15[0]",
+    "type": "text",
+    "label": "Schedule B line 8: Accounting income",
+    "page": 2,
+    "printed": {
+     "left": "the governing instrument and applicable local law 8",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_9": {
+    "field": "topmostSubform[0].Page2[0].f2_16[0]",
+    "type": "text",
+    "label": "Schedule B line 9",
+    "page": 2,
+    "printed": {
+     "left": "9 Income required to be distributed currently 9",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_10": {
+    "field": "topmostSubform[0].Page2[0].f2_17[0]",
+    "type": "text",
+    "label": "Schedule B line 10",
+    "page": 2,
+    "printed": {
+     "left": "credited, or otherwise required to be distributed 10",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_11": {
+    "field": "topmostSubform[0].Page2[0].f2_18[0]",
+    "type": "text",
+    "label": "Schedule B line 11",
+    "page": 2,
+    "printed": {
+     "left": "If greater than line 8, see instructions 11",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_12": {
+    "field": "topmostSubform[0].Page2[0].f2_19[0]",
+    "type": "text",
+    "label": "Schedule B line 12",
+    "page": 2,
+    "printed": {
+     "left": "of tax-exempt income included on line 11 12",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_13": {
+    "field": "topmostSubform[0].Page2[0].f2_20[0]",
+    "type": "text",
+    "label": "Schedule B line 13",
+    "page": 2,
+    "printed": {
+     "left": "deduction. Subtract line 12 from line 11 13",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_14": {
+    "field": "topmostSubform[0].Page2[0].f2_21[0]",
+    "type": "text",
+    "label": "Schedule B line 14",
+    "page": 2,
+    "printed": {
+     "left": "7. If zero or less, enter -0- 14",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schB_15": {
+    "field": "topmostSubform[0].Page2[0].f2_22[0]",
+    "type": "text",
+    "label": "Schedule B line 15: Income distribution deduction",
+    "page": 2,
+    "printed": {
+     "left": "here and on page 1, line 18 15",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schG_1a": {
+    "field": "topmostSubform[0].Page2[0].Ln1a_ReadOrder[0].f2_23[0]",
+    "type": "text",
+    "label": "Schedule G line 1a: Tax on taxable income",
+    "page": 2,
+    "printed": {
+     "left": "a Tax on taxable income. See instructions 1a",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schG_1e": {
+    "field": "topmostSubform[0].Page2[0].f2_27[0]",
+    "type": "text",
+    "label": "Schedule G line 1e",
+    "page": 2,
+    "printed": {
+     "left": "e Total. Add lines 1a through 1d 1e",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schG_3": {
+    "field": "topmostSubform[0].Page2[0].f2_33[0]",
+    "type": "text",
+    "label": "Schedule G line 3",
+    "page": 2,
+    "printed": {
+     "left": "1e. If zero or less, enter -0- 3",
+     "above": "",
+     "right": ""
+    }
+   },
+   "schG_9": {
+    "field": "topmostSubform[0].Page2[0].f2_42[0]",
+    "type": "text",
+    "label": "Schedule G line 9: Total tax",
+    "page": 2,
+    "printed": {
+     "left": "here and on page 1, line 24 9",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q1_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_2[0]",
+    "type": "checkbox",
+    "label": "Other Information 1: Yes",
+    "page": 3,
+    "printed": {
+     "left": "attach a computation of the allocation of expenses.",
+     "above": "Yes",
+     "right": ""
+    }
+   },
+   "q1_no": {
+    "field": "topmostSubform[0].Page3[0].c3_2[1]",
+    "type": "checkbox",
+    "label": "Other Information 1: No",
+    "page": 3,
+    "printed": {
+     "left": "attach a computation of the allocation of expenses.",
+     "above": "No",
+     "right": ""
+    }
+   },
+   "q1_amount": {
+    "field": "topmostSubform[0].Page3[0].f3_13[0]",
+    "type": "text",
+    "label": "Other Information 1: tax-exempt amount",
+    "page": 3,
+    "printed": {
+     "left": "of tax-exempt interest income and exempt-interest dividends $",
+     "above": "of expenses.",
+     "right": ""
+    }
+   },
+   "q2_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_3[0]",
+    "type": "checkbox",
+    "label": "Other Information 2: Yes",
+    "page": 3,
+    "printed": {
+     "left": "reason of a contract assignment or similar arrangement?",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q2_no": {
+    "field": "topmostSubform[0].Page3[0].c3_3[1]",
+    "type": "checkbox",
+    "label": "Other Information 2: No",
+    "page": 3,
+    "printed": {
+     "left": "reason of a contract assignment or similar arrangement?",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q3_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_4[0]",
+    "type": "checkbox",
+    "label": "Other Information 3: Yes",
+    "page": 3,
+    "printed": {
+     "left": "or other financial account in a foreign country?",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q3_no": {
+    "field": "topmostSubform[0].Page3[0].c3_4[1]",
+    "type": "checkbox",
+    "label": "Other Information 3: No",
+    "page": 3,
+    "printed": {
+     "left": "or other financial account in a foreign country?",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q4_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_5[0]",
+    "type": "checkbox",
+    "label": "Other Information 4: Yes",
+    "page": 3,
+    "printed": {
+     "left": "3520-A. See instructions",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q4_no": {
+    "field": "topmostSubform[0].Page3[0].c3_5[1]",
+    "type": "checkbox",
+    "label": "Other Information 4: No",
+    "page": 3,
+    "printed": {
+     "left": "3520-A. See instructions",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q5_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_6[0]",
+    "type": "checkbox",
+    "label": "Other Information 5: Yes",
+    "page": 3,
+    "printed": {
+     "left": "the instructions for the required attachment",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q5_no": {
+    "field": "topmostSubform[0].Page3[0].c3_6[1]",
+    "type": "checkbox",
+    "label": "Other Information 5: No",
+    "page": 3,
+    "printed": {
+     "left": "the instructions for the required attachment",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q9_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_10[0]",
+    "type": "checkbox",
+    "label": "Other Information 9: Yes",
+    "page": 3,
+    "printed": {
+     "left": "or future trust beneficiaries skip persons? See instructions",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q9_no": {
+    "field": "topmostSubform[0].Page3[0].c3_10[1]",
+    "type": "checkbox",
+    "label": "Other Information 9: No",
+    "page": 3,
+    "printed": {
+     "left": "or future trust beneficiaries skip persons? See instructions",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q10_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_11[0]",
+    "type": "checkbox",
+    "label": "Other Information 10: Yes",
+    "page": 3,
+    "printed": {
+     "left": "Form 8938",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q10_no": {
+    "field": "topmostSubform[0].Page3[0].c3_11[1]",
+    "type": "checkbox",
+    "label": "Other Information 10: No",
+    "page": 3,
+    "printed": {
+     "left": "Form 8938",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q11a_no": {
+    "field": "topmostSubform[0].Page3[0].c3_12[1]",
+    "type": "checkbox",
+    "label": "Other Information 11a: No",
+    "page": 3,
+    "printed": {
+     "left": "for which it made a section 965(i) election?",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q12_no": {
+    "field": "topmostSubform[0].Page3[0].c3_14[1]",
+    "type": "checkbox",
+    "label": "Other Information 12: No",
+    "page": 3,
+    "printed": {
+     "left": "last day of the tax year? See instructions",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q13_yes": {
+    "field": "topmostSubform[0].Page3[0].c3_15[0]",
+    "type": "checkbox",
+    "label": "Other Information 13: Yes",
+    "page": 3,
+    "printed": {
+     "left": "instructions",
+     "above": "",
+     "right": ""
+    }
+   },
+   "q13_no": {
+    "field": "topmostSubform[0].Page3[0].c3_15[1]",
+    "type": "checkbox",
+    "label": "Other Information 13: No",
+    "page": 3,
+    "printed": {
+     "left": "instructions",
+     "above": "",
+     "right": ""
+    }
+   }
+  }
+ },
+ "f1041sd": {
+  "file": "sources/f1041sd_2025.pdf",
+  "fields": {
+   "trust_name": {
+    "field": "topmostSubform[0].Page1[0].f1_01[0]",
+    "type": "text",
+    "label": "Name of estate or trust",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Name of estate or trust",
+     "right": ""
+    }
+   },
+   "ein": {
+    "field": "topmostSubform[0].Page1[0].f1_02[0]",
+    "type": "text",
+    "label": "Employer identification number",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Employer identification number",
+     "right": ""
+    }
+   },
+   "l1a_d": {
+    "field": "topmostSubform[0].Page1[0].Table_Part1[0].Line1a[0].f1_03[0]",
+    "type": "text",
+    "label": "Line 1a (d) Proceeds",
+    "page": 1,
+    "printed": {
+     "left": "this line blank and go to line 1b",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l1a_e": {
+    "field": "topmostSubform[0].Page1[0].Table_Part1[0].Line1a[0].f1_04[0]",
+    "type": "text",
+    "label": "Line 1a (e) Cost",
+    "page": 1,
+    "printed": {
+     "left": "this line blank and go to line 1b",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l1a_h": {
+    "field": "topmostSubform[0].Page1[0].Table_Part1[0].Line1a[0].f1_06[0]",
+    "type": "text",
+    "label": "Line 1a (h) Gain or (loss)",
+    "page": 1,
+    "printed": {
+     "left": "this line blank and go to line 1b",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l6": {
+    "field": "topmostSubform[0].Page1[0].f1_21[0]",
+    "type": "text",
+    "label": "Line 6: Short-term capital loss carryover",
+    "page": 1,
+    "printed": {
+     "left": "Carryover Worksheet 6 (",
+     "above": "",
+     "right": ")"
+    }
+   },
+   "l7": {
+    "field": "topmostSubform[0].Page1[0].f1_22[0]",
+    "type": "text",
+    "label": "Line 7: Net short-term capital gain or (loss)",
+    "page": 1,
+    "printed": {
+     "left": "Part III, line 17, column (3) 7",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l8a_d": {
+    "field": "topmostSubform[0].Page1[0].Table_Part2[0].Line8a[0].f1_23[0]",
+    "type": "text",
+    "label": "Line 8a (d) Proceeds",
+    "page": 1,
+    "printed": {
+     "left": "this line blank and go to line 8b",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l8a_e": {
+    "field": "topmostSubform[0].Page1[0].Table_Part2[0].Line8a[0].f1_24[0]",
+    "type": "text",
+    "label": "Line 8a (e) Cost",
+    "page": 1,
+    "printed": {
+     "left": "this line blank and go to line 8b",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l8a_h": {
+    "field": "topmostSubform[0].Page1[0].Table_Part2[0].Line8a[0].f1_26[0]",
+    "type": "text",
+    "label": "Line 8a (h) Gain or (loss)",
+    "page": 1,
+    "printed": {
+     "left": "this line blank and go to line 8b",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l13": {
+    "field": "topmostSubform[0].Page1[0].f1_41[0]",
+    "type": "text",
+    "label": "Line 13: Capital gain distributions",
+    "page": 1,
+    "printed": {
+     "left": "13 Capital gain distributions 13",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l15": {
+    "field": "topmostSubform[0].Page1[0].f1_43[0]",
+    "type": "text",
+    "label": "Line 15: Long-term capital loss carryover",
+    "page": 1,
+    "printed": {
+     "left": "Carryover Worksheet 15 (",
+     "above": "",
+     "right": ")"
+    }
+   },
+   "l16": {
+    "field": "topmostSubform[0].Page1[0].f1_44[0]",
+    "type": "text",
+    "label": "Line 16: Net long-term capital gain or (loss)",
+    "page": 1,
+    "printed": {
+     "left": "Part III, line 18a, column (3) 16",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l17_1": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line17[0].f2_01[0]",
+    "type": "text",
+    "label": "Line 17 column (1) Beneficiaries",
+    "page": 2,
+    "printed": {
+     "left": "17 Net short-term gain or (loss) 17",
+     "above": "(see instr.)",
+     "right": ""
+    }
+   },
+   "l17_2": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line17[0].f2_02[0]",
+    "type": "text",
+    "label": "Line 17 column (2) Trust",
+    "page": 2,
+    "printed": {
+     "left": "17 Net short-term gain or (loss) 17",
+     "above": "or trust’s",
+     "right": ""
+    }
+   },
+   "l17_3": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line17[0].f2_03[0]",
+    "type": "text",
+    "label": "Line 17 column (3) Total",
+    "page": 2,
+    "printed": {
+     "left": "17 Net short-term gain or (loss) 17",
+     "above": "Total (3)",
+     "right": ""
+    }
+   },
+   "l18a_1": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line18a[0].f2_04[0]",
+    "type": "text",
+    "label": "Line 18a column (1)",
+    "page": 2,
+    "printed": {
+     "left": "a Total for year 18a",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l18a_2": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line18a[0].f2_05[0]",
+    "type": "text",
+    "label": "Line 18a column (2)",
+    "page": 2,
+    "printed": {
+     "left": "a Total for year 18a",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l18a_3": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line18a[0].f2_06[0]",
+    "type": "text",
+    "label": "Line 18a column (3)",
+    "page": 2,
+    "printed": {
+     "left": "a Total for year 18a",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l19_1": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line19[0].f2_13[0]",
+    "type": "text",
+    "label": "Line 19 column (1)",
+    "page": 2,
+    "printed": {
+     "left": "or (loss). Combine lines 17 and 18a 19",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l19_2": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line19[0].f2_14[0]",
+    "type": "text",
+    "label": "Line 19 column (2)",
+    "page": 2,
+    "printed": {
+     "left": "or (loss). Combine lines 17 and 18a 19",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l19_3": {
+    "field": "topmostSubform[0].Page2[0].Table_Part3[0].Line19[0].f2_15[0]",
+    "type": "text",
+    "label": "Line 19 column (3)",
+    "page": 2,
+    "printed": {
+     "left": "or (loss). Combine lines 17 and 18a 19",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l20": {
+    "field": "topmostSubform[0].Page2[0].f2_16[0]",
+    "type": "text",
+    "label": "Line 20: Capital loss limitation",
+    "page": 2,
+    "printed": {
+     "left": "19, column (3); or b $3,000 20 (",
+     "above": "",
+     "right": ")"
+    }
+   },
+   "l21": {
+    "field": "topmostSubform[0].Page2[0].f2_17[0]",
+    "type": "text",
+    "label": "Part V line 21",
+    "page": 2,
+    "printed": {
+     "left": "(or Form 990-T, Part I, line 11) 21",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l22": {
+    "field": "topmostSubform[0].Page2[0].Line22_ReadOrder[0].f2_18[0]",
+    "type": "text",
+    "label": "Part V line 22",
+    "page": 2,
+    "printed": {
+     "left": "less than zero 22",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l23": {
+    "field": "topmostSubform[0].Page2[0].f2_19[0]",
+    "type": "text",
+    "label": "Part V line 23",
+    "page": 2,
+    "printed": {
+     "left": "income in Part I of Form 990-T) 23",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l24": {
+    "field": "topmostSubform[0].Page2[0].f2_20[0]",
+    "type": "text",
+    "label": "Part V line 24",
+    "page": 2,
+    "printed": {
+     "left": "24 Add lines 22 and 23 24",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l25": {
+    "field": "topmostSubform[0].Page2[0].f2_21[0]",
+    "type": "text",
+    "label": "Part V line 25",
+    "page": 2,
+    "printed": {
+     "left": "amount from line 4g; otherwise, enter -0- 25",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l26": {
+    "field": "topmostSubform[0].Page2[0].f2_22[0]",
+    "type": "text",
+    "label": "Part V line 26",
+    "page": 2,
+    "printed": {
+     "left": "24. If zero or less, enter -0- 26",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l27": {
+    "field": "topmostSubform[0].Page2[0].f2_23[0]",
+    "type": "text",
+    "label": "Part V line 27",
+    "page": 2,
+    "printed": {
+     "left": "21. If zero or less, enter -0- 27",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l28": {
+    "field": "topmostSubform[0].Page2[0].f2_24[0]",
+    "type": "text",
+    "label": "Part V line 28",
+    "page": 2,
+    "printed": {
+     "left": "the amount on line 21 or $3,250 28",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l29": {
+    "field": "topmostSubform[0].Page2[0].f2_25[0]",
+    "type": "text",
+    "label": "Part V line 29",
+    "page": 2,
+    "printed": {
+     "left": "amount on line 27 or line 28 29",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l30": {
+    "field": "topmostSubform[0].Page2[0].f2_26[0]",
+    "type": "text",
+    "label": "Part V line 30",
+    "page": 2,
+    "printed": {
+     "left": "-0-. This amount is taxed at 0% 30",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l31": {
+    "field": "topmostSubform[0].Page2[0].f2_27[0]",
+    "type": "text",
+    "label": "Part V line 31",
+    "page": 2,
+    "printed": {
+     "left": "smaller of line 21 or line 26 31",
+     "above": ". . . . . .",
+     "right": ""
+    }
+   },
+   "l32": {
+    "field": "topmostSubform[0].Page2[0].f2_28[0]",
+    "type": "text",
+    "label": "Part V line 32",
+    "page": 2,
+    "printed": {
+     "left": "32 Subtract line 30 from line 26 32",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l33": {
+    "field": "topmostSubform[0].Page2[0].f2_29[0]",
+    "type": "text",
+    "label": "Part V line 33",
+    "page": 2,
+    "printed": {
+     "left": "the smaller of line 21 or $15,900 33",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l34": {
+    "field": "topmostSubform[0].Page2[0].f2_30[0]",
+    "type": "text",
+    "label": "Part V line 34",
+    "page": 2,
+    "printed": {
+     "left": "34 Add lines 27 and 30 34",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l35": {
+    "field": "topmostSubform[0].Page2[0].f2_31[0]",
+    "type": "text",
+    "label": "Part V line 35",
+    "page": 2,
+    "printed": {
+     "left": "33. If zero or less, enter -0- 35",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l36": {
+    "field": "topmostSubform[0].Page2[0].f2_32[0]",
+    "type": "text",
+    "label": "Part V line 36",
+    "page": 2,
+    "printed": {
+     "left": "smaller of line 32 or line 35 36",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l37": {
+    "field": "topmostSubform[0].Page2[0].f2_33[0]",
+    "type": "text",
+    "label": "Part V line 37",
+    "page": 2,
+    "printed": {
+     "left": "37 Multiply line 36 by 15% (0.15) 37",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l38": {
+    "field": "topmostSubform[0].Page2[0].f2_34[0]",
+    "type": "text",
+    "label": "Part V line 38",
+    "page": 2,
+    "printed": {
+     "left": "38 Enter the amount from line 31 38",
+     "above": ". . . . . .",
+     "right": ""
+    }
+   },
+   "l39": {
+    "field": "topmostSubform[0].Page2[0].f2_35[0]",
+    "type": "text",
+    "label": "Part V line 39",
+    "page": 2,
+    "printed": {
+     "left": "39 Add lines 30 and 36 39",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l40": {
+    "field": "topmostSubform[0].Page2[0].f2_36[0]",
+    "type": "text",
+    "label": "Part V line 40",
+    "page": 2,
+    "printed": {
+     "left": "38. If zero or less, enter -0- 40",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l41": {
+    "field": "topmostSubform[0].Page2[0].f2_37[0]",
+    "type": "text",
+    "label": "Part V line 41",
+    "page": 2,
+    "printed": {
+     "left": "41 Multiply line 40 by 20% (0.20) 41",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l42": {
+    "field": "topmostSubform[0].Page2[0].Line42_ReadOrder[0].f2_38[0]",
+    "type": "text",
+    "label": "Part V line 42",
+    "page": 2,
+    "printed": {
+     "left": "instructions in the Instructions for Form 1041 42",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l43": {
+    "field": "topmostSubform[0].Page2[0].f2_39[0]",
+    "type": "text",
+    "label": "Part V line 43",
+    "page": 2,
+    "printed": {
+     "left": "43 Add lines 37, 41, and 42 43",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l44": {
+    "field": "topmostSubform[0].Page2[0].f2_40[0]",
+    "type": "text",
+    "label": "Part V line 44",
+    "page": 2,
+    "printed": {
+     "left": "instructions in the Instructions for Form 1041 44",
+     "above": "",
+     "right": ""
+    }
+   },
+   "l45": {
+    "field": "topmostSubform[0].Page2[0].f2_41[0]",
+    "type": "text",
+    "label": "Part V line 45",
+    "page": 2,
+    "printed": {
+     "left": "(or Form 990-T, Part II, line 2) 45",
+     "above": "",
+     "right": ""
+    }
+   }
+  }
+ },
+ "f1041sk1": {
+  "file": "sources/f1041sk1_2025.pdf",
+  "fields": {
+   "final_k1": {
+    "field": "topmostSubform[0].Page1[0].PageHeader[0].c1_1[0]",
+    "type": "checkbox",
+    "label": "Final K-1",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "",
+     "right": "Final K-1 Amended"
+    }
+   },
+   "trust_ein": {
+    "field": "topmostSubform[0].Page1[0].LeftCol[0].f1_6[0]",
+    "type": "text",
+    "label": "A: Estate's or trust's EIN",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Estate’s or trust’s employer identification number A",
+     "right": ""
+    }
+   },
+   "trust_name": {
+    "field": "topmostSubform[0].Page1[0].LeftCol[0].f1_7[0]",
+    "type": "text",
+    "label": "B: Estate's or trust's name",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Estate’s or trust’s name B",
+     "right": ""
+    }
+   },
+   "fiduciary_block": {
+    "field": "topmostSubform[0].Page1[0].LeftCol[0].f1_8[0]",
+    "type": "text",
+    "label": "C: Fiduciary's name, address, city, state, and ZIP code",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Fiduciary’s name, address, city, state, and ZIP",
+     "right": "7 Net rental real estate"
+    }
+   },
+   "final_1041": {
+    "field": "topmostSubform[0].Page1[0].LeftCol[0].c1_3[0]",
+    "type": "checkbox",
+    "label": "E: Final Form 1041 for the estate or trust",
+    "page": 1,
+    "printed": {
+     "left": "E",
+     "above": "",
+     "right": "Check if this is the"
+    }
+   },
+   "ben_tin": {
+    "field": "topmostSubform[0].Page1[0].LeftCol[0].f1_10[0]",
+    "type": "text",
+    "label": "F: Beneficiary's identifying number",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Beneficiary’s identifying number F",
+     "right": ""
+    }
+   },
+   "ben_block": {
+    "field": "topmostSubform[0].Page1[0].LeftCol[0].f1_11[0]",
+    "type": "text",
+    "label": "G: Beneficiary's name, address, city, state, and ZIP code",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Beneficiary’s name, address, city, state, and ZIP",
+     "right": ""
+    }
+   },
+   "box_1": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines1-10[0].f1_12[0]",
+    "type": "text",
+    "label": "Box 1: Interest income",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Interest income",
+     "right": ""
+    }
+   },
+   "box_2a": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines1-10[0].f1_13[0]",
+    "type": "text",
+    "label": "Box 2a: Ordinary dividends",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Ordinary dividends",
+     "right": ""
+    }
+   },
+   "box_2b": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines1-10[0].f1_14[0]",
+    "type": "text",
+    "label": "Box 2b: Qualified dividends",
+    "page": 1,
+    "printed": {
+     "left": "Credits, etc. See back of form and instructions.",
+     "above": "Qualified dividends",
+     "right": ""
+    }
+   },
+   "box_3": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines1-10[0].f1_15[0]",
+    "type": "text",
+    "label": "Box 3: Net short-term capital gain",
+    "page": 1,
+    "printed": {
+     "left": "A Estate’s or trust’s employer identification number",
+     "above": "Net short-term capital gain",
+     "right": ""
+    }
+   },
+   "box_4a": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines1-10[0].f1_16[0]",
+    "type": "text",
+    "label": "Box 4a: Net long-term capital gain",
+    "page": 1,
+    "printed": {
+     "left": "",
+     "above": "Net long-term capital gain",
+     "right": ""
+    }
+   },
+   "box_14_code": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines11-14[0].f1_56[0]",
+    "type": "text",
+    "label": "Box 14: Other information, code",
+    "page": 1,
+    "printed": {
+     "left": "final Form 1041 for the estate or trust",
+     "above": "14",
+     "right": ""
+    }
+   },
+   "box_14_amount": {
+    "field": "topmostSubform[0].Page1[0].RightCol[0].Lines11-14[0].f1_57[0]",
+    "type": "text",
+    "label": "Box 14: Other information, amount",
+    "page": 1,
+    "printed": {
+     "left": "final Form 1041 for the estate or trust",
+     "above": "Other information",
+     "right": ""
+    }
+   }
+  }
+ }
 }
