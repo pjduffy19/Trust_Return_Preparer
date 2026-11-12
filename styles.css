@@ -570,6 +570,28 @@ a { color: var(--accent); }
 .flag-count { margin-left: 0; }
 @media (max-width: 820px) { .q-grid, .q-grid-inner { grid-template-columns: minmax(0, 1fr); } }
 
+/* ---------- Review gate and result ---------- */
+.review-list { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.review-list:empty::before { content: "Nothing here."; color: var(--text-muted); border: 1px dashed var(--border-strong); border-radius: 12px; padding: 14px 16px; }
+.review-card { border: 1px solid var(--border); border-left: 4px solid var(--low-fg); border-radius: 12px; padding: 14px 16px; background: var(--bg-raised); display: flex; flex-direction: column; gap: 8px; }
+.review-card.is-medium { border-left-color: var(--med-fg); }
+.review-card.is-escalated { border-left-color: var(--border-strong); }
+.review-card.is-resolved { border-left-color: var(--high-fg); }
+.review-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: baseline; }
+.review-title { font-weight: 600; }
+.review-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+.review-line { font-size: 13px; color: var(--text-muted); }
+.review-state { font-size: 13px; font-weight: 600; color: var(--high-fg); }
+.review-card.is-escalated .review-state, .review-state.esc { color: var(--med-fg); }
+.review-card .btn { min-height: 40px; font-size: 14px; padding: 0 12px; }
+.blockers { width: 100%; background: var(--low-bg); color: var(--low-fg); border-radius: 12px; padding: 12px 16px; }
+.blockers ul { list-style: disc; padding-left: 20px; margin-top: 4px; }
+.complete-result { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.complete-result h3 { margin-top: 6px; }
+.complete-result ul { list-style: disc; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
+.esc-label { display: inline-block; font-size: 12px; font-weight: 600; color: var(--med-fg); background: var(--med-bg); border-radius: 999px; padding: 4px 10px; }
+.items-table td.basis { font-size: 13px; color: var(--text-muted); }
+
 /* ---------- Rename and masking ---------- */
 .topbar-title { flex: 0 1 auto; }
 .rename-btn { width: 36px; height: 36px; color: var(--text-muted); margin-right: auto; }

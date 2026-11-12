@@ -18,7 +18,7 @@ To use AI-assisted intake, paste your own Google Gemini API key on the first scr
 | 2 | Document upload, two-method extraction, validations, confidence, source panel | Built |
 | 3 | Trust profile questions, simple/complex classification, out-of-scope refusal, prior-year flow | Built |
 | 4 | Rules engine, cited constants, test cases 1–4 | Built |
-| 5 | Review gate, escalations, test cases 5–7 | Not started |
+| 5 | Review gate, escalations, test cases 5–7 | Built |
 | 6 | PDF field mapping and filling, review log export, reviewer sign-off | Not started |
 | 7 | Full README, known limitations, boundary check | Not started |
 
@@ -47,13 +47,22 @@ SSNs and EINs are typed into masked boxes, kept in memory for the final PDF only
 
 ## The calculation
 
-`rules/engine.js` computes the return in form order, with no AI: Schedule D, page 1 income and deductions, Schedule B (distributable net income and the income distribution deduction), the exemption, taxable income, the tax on Schedule G line 1a, and each beneficiary's Schedule K-1 amounts. Every step is recorded with the IRS excerpt it applies. The calculation is not yet shown in the app; that comes with the review gate.
+`rules/engine.js` computes the return in form order, with no AI: Schedule D, page 1 income and deductions, Schedule B (distributable net income and the income distribution deduction), the exemption, taxable income, the tax on Schedule G line 1a, and each beneficiary's Schedule K-1 amounts. Every step is recorded with the IRS excerpt it applies. The app runs it when you press Generate on the review screen.
 
 - **Constants** are in `rules/constants_2025.js`, each copied from the IRS PDFs with its page number: the 2025 tax rate schedule, the capital gain breakpoints, the exemptions, the capital loss limit and the NIIT threshold.
 - **Tax** uses Schedule D Part V (or the Qualified Dividends Tax Worksheet) when there are capital gains or qualified dividends kept by the trust, and the rate schedule otherwise.
 - **Method choices** are listed as assumptions for the reviewer: expenses go to tax-exempt income in proportion to gross accounting income; other deductions are spread over interest and dividends in proportion; qualified dividends follow the share of DNI distributed.
 - **Refusals.** The engine will not compute when the classification, the capital gain allocation or the fee allocation is undecided, when there are charitable amounts (Schedule A), or for a complex trust with gains allocated to income.
+- **Also refused:** wash sales or market discount on a sale (Form 8949), and Form 1099-DIV boxes 2b, 2c or 2d (Schedule D Tax Worksheet).
 - **Not computed:** Net Investment Income Tax (flagged when taxable income is above the threshold), alternative minimum tax, credits, estimated tax payments and next year's capital loss carryover.
+
+## The review gate
+
+The review screen lists every Low item as a card with Confirm, Edit, View source and Escalate. Low items are document values whose checks failed and profile answers that are undecided or disagree with another source. Medium items are listed for an optional look.
+
+**Generate Form 1041 stays locked until** the documents are read, the trust questions are finished, every Low item is confirmed, corrected or escalated, and the rules engine can actually compute the return. Escalating does not make an undecided fact decided: if the instrument is silent on capital gains, for example, the item can be escalated but the return stays locked until someone decides it.
+
+Generating shows the key lines, each with its amount, a confidence that is the lowest of its inputs, and the rule it came from, plus the Schedule K-1 amounts, the method choices and everything escalated to the reviewer. Changing any input afterwards marks the result stale and it must be generated again.
 
 ## Tests
 

@@ -138,6 +138,9 @@
       pii: {},              // full SSNs and EINs: memory only, never logged, never sent to the AI
       profileStarted: false,
       profileDone: false,
+      flagState: {},        // profile flag id -> 'confirmed' | 'escalated'
+      result: null,         // the engine's output once the return is generated
+      escalated: 0,
       counts: { high: 0, medium: 0, low: 0 },
       log: [],
       status: 'Simple or complex: pending your answers',
@@ -566,6 +569,7 @@
       return;
     }
     q.answer = value; q.answerLabel = label;
+    invalidate(r);
     var unsure = value === 'unsure' || (value && value.skipped);
     r.answers[def.id] = { value: value, label: label, confidence: unsure ? 'low' : 'high', reason: unsure ? 'You answered Not sure' : 'You answered this directly' };
     r.dirty = true;
@@ -599,6 +603,9 @@
     if (r.busy) return;
     var def = q.def;
     log('profile.changed', { question: def.id, was: q.answerLabel }, r);
+    TRP.profile.flags(ctxOf(r)).forEach(function (f) { if (f.pid === def.id) delete r.flagState[f.id]; });
+    invalidate(r);
+    r.profileDone = false;
     q.superseded = true;
     delete r.answers[def.id];
     if (def.type === 'tin') delete r.pii[def.id];
@@ -627,7 +634,10 @@
       blocks.push({ type: 'p', text: 'For the reviewer, outside what this tool computes:' });
       blocks.push({ type: 'ul', items: esc.map(function (f) { return f.text + '.'; }) });
     }
-    blocks.push({ type: 'p', text: 'Next is the review of low-confidence items, then the calculation. Those steps are built in later milestones.' });
+    var g = gate(r);
+    blocks.push({ type: 'p', text: g.canGenerate ? 'Nothing is blocking the return. Open the review screen to look over the Medium items and generate it.'
+      : 'Next, open the review screen: ' + g.why.replace(/ first$/, '') + ', then generate the return.' });
+    blocks.push({ type: 'actions', actions: [{ label: 'Open the review screen', run: function () { setView('review'); } }] });
     say(r, blocks);
     log('profile.complete', { summary: TRP.profile.summary(ctx), flags: flags }, r);
   }
@@ -808,8 +818,7 @@
     Object.keys(r.answers).forEach(function (k) { if (r.answers[k].confidence === 'high') r.counts.high++; });
     var flags = TRP.profile.flags(ctxOf(r));
     r.counts.low += flags.filter(function (f) { return f.level === 'low'; }).length;
-    r.escalated = flags.filter(function (f) { return f.level === 'escalate'; }).length +
-      r.items.filter(function (i) { return i.escalate && i.value; }).length;
+    r.escalated = escalations(r, null).length;
   }
 
   function addItems(r, doc, items) {
@@ -883,6 +892,7 @@
     var blocks = resultBlocks(r, docs, itemIds, useAi);
     blocks.push({ type: 'p', text: timingNote(r, logStart, started, useAi), small: true });
     say(r, blocks);
+    invalidate(r);
     if (r.items.length) startProfile(r);
     askNext(r);                         // new documents can answer, or change, a pending question
     r.busy = false;
@@ -969,15 +979,274 @@
         body));
   }
 
+  /* ---------- Review gate ---------- */
+
+  var FEEDS = {
+    int_1: 'Form 1041, line 1', int_3: 'Form 1041, line 1', int_8: 'Schedule B, line 2', div_12: 'Schedule B, line 2',
+    div_1a: 'Form 1041, line 2a', div_1b: 'Form 1041, line 2b', div_2a: 'Schedule D, line 13',
+    b_1d: 'Schedule D, Parts I and II', b_1e: 'Schedule D, Parts I and II', b_term: 'Schedule D, Parts I and II',
+    sum_fees: 'Form 1041, line 12', sum_prof: 'Form 1041, line 14',
+    sum_income_dist: 'Schedule B, line 10', sum_principal_dist: 'Schedule B, line 10',
+    prior_stcl: 'Schedule D, line 6', prior_ltcl: 'Schedule D, line 15'
+  };
+  function feeds(item) {
+    var f = TRP.extract.field(item.fieldId);
+    return FEEDS[item.fieldId] || (f.use === 'escalate' ? 'Not used in the calculation' : f.use === 'prior' ? 'Prior-year check' : 'Supporting detail');
+  }
+
+  /**
+   * Everything that decides whether the return can be generated.
+   * Low entries are document values that started Low and profile flags at Low. Each must be
+   * confirmed, corrected or escalated. Escalating does not make an undecided fact decided:
+   * the engine must also be able to compute, or Generate stays locked.
+   */
+  function gate(r) {
+    var ctx = ctxOf(r), entries = [];
+    r.items.forEach(function (it) {
+      if (it.startedLow) entries.push({ kind: 'item', item: it, resolved: it.status !== 'open' });
+    });
+    TRP.profile.flags(ctx).forEach(function (f) {
+      if (f.level === 'low') entries.push({ kind: 'flag', flag: f, state: r.flagState[f.id] || '', resolved: !!r.flagState[f.id] });
+    });
+    var done = entries.filter(function (e) { return e.resolved; }).length;
+    var stop = TRP.profile.stop(ctx);
+    var engine = r.profileDone && !stop ? TRP.engine.compute(TRP.engine.inputFrom(r.items, ctx.a, ctx.facts)) : null;
+    var why = stop ? 'this return is outside the tool\'s scope'
+      : !r.items.length ? 'add the documents first'
+      : !r.profileDone ? 'finish the trust questions first'
+      : done < entries.length ? 'resolve ' + plural(entries.length - done, 'item') + ' first'
+      : !engine.ok ? 'it cannot be calculated yet' : '';
+    return { entries: entries, done: done, total: entries.length, engine: engine, canGenerate: !why, why: why };
+  }
+  TRP.gate = function () { var r = active(); return r ? gate(r) : null; };
+
+  /** Any change to an input makes an earlier result stale. */
+  function invalidate(r) {
+    if (r.result) { r.result = null; log('return.stale', { reason: 'An input changed after the return was generated' }, r); }
+    if (r.step === 'generate') r.step = 'review';
+  }
+
+  function escalateItem(r, item) {
+    item.status = 'escalated';
+    log('item.escalated', { document: findDoc(r, item.docId).name, item: itemLabel(item), value: itemAmount(item), reason: item.reason }, r);
+    invalidate(r); recount(r); renderAll();
+  }
+
+  function setFlag(r, flag, value) {
+    r.flagState[flag.id] = value;
+    log(value === 'escalated' ? 'flag.escalated' : 'flag.confirmed', { flag: flag.id, text: flag.text }, r);
+    invalidate(r); recount(r); renderAll();
+  }
+
+  function findAnswered(r, pid) {
+    for (var i = r.messages.length - 1; i >= 0; i--) {
+      var blocks = r.messages[i].blocks || [];
+      for (var j = 0; j < blocks.length; j++) {
+        var q = blocks[j].q;
+        if (blocks[j].type === 'question' && q.pid === pid && q.answer != null && !q.superseded) return q;
+      }
+    }
+    return null;
+  }
+
+  function reviewButton(label, run, primary, disabled) {
+    return el('button', { type: 'button', class: 'btn ' + (primary ? 'btn-primary' : 'btn-outline'), disabled: disabled, onclick: run }, label);
+  }
+
+  function itemCard(r, item, level) {
+    var doc = findDoc(r, item.docId), open = item.status === 'open';
+    var state = item.status === 'escalated' ? 'Escalated to reviewer' : item.status === 'confirmed' ? 'Confirmed by you' : item.status === 'edited' ? 'Corrected by you' : '';
+    return el('div', { class: 'review-card' + (level === 'medium' ? ' is-medium' : '') + (item.status === 'escalated' ? ' is-escalated' : !open ? ' is-resolved' : '') },
+      el('div', { class: 'review-head' },
+        el('span', { class: 'review-title' }, TRP.extract.FORMS[item.formId].short + ' · ' + itemLabel(item)),
+        el('span', { class: 'review-amount' }, itemAmount(item))),
+      el('span', { class: 'review-line' }, feeds(item) + ' · ' + (doc ? doc.name : '')),
+      el('p', {}, badge(item.confidence), ' ', el('span', { class: 'reason' }, item.reason)),
+      state ? el('span', { class: 'review-state' + (item.status === 'escalated' ? ' esc' : '') }, state) : null,
+      el('div', { class: 'btn-row' },
+        open && item.value !== null ? reviewButton('Confirm', function () { confirmItem(r, item); }, true) : null,
+        reviewButton(item.value === null ? 'Enter value' : 'Edit', function () { state_openEdit(item.id); }),
+        reviewButton('View source', function () { openSource(item.id); }),
+        open && level === 'low' ? reviewButton('Escalate', function () { escalateItem(r, item); }) : null));
+  }
+
+  function state_openEdit(itemId) {
+    state.panel = { mode: 'source', itemId: itemId, editing: true };
+    renderPanel();
+  }
+
+  function flagCard(r, entry) {
+    var f = entry.flag;
+    var change = f.pid && findAnswered(r, f.pid);
+    return el('div', { class: 'review-card' + (entry.state === 'escalated' ? ' is-escalated' : entry.resolved ? ' is-resolved' : '') },
+      el('div', { class: 'review-head' }, el('span', { class: 'review-title' }, f.text)),
+      el('span', { class: 'review-line' }, 'Trust profile'),
+      el('p', {}, badge('low'), ' ', el('span', { class: 'reason' }, f.confirmable ? 'Your answer disagrees with another source' : 'This rests on an answer that is not decided')),
+      entry.state ? el('span', { class: 'review-state' + (entry.state === 'escalated' ? ' esc' : '') }, entry.state === 'escalated' ? 'Escalated to reviewer' : 'Checked and kept by you') : null,
+      el('div', { class: 'btn-row' },
+        !entry.resolved && f.confirmable ? reviewButton("I've checked. Keep my answer", function () { setFlag(r, f, 'confirmed'); }, true) : null,
+        change ? reviewButton('Change answer', function () { setView('chat'); changeAnswer(r, change); }) : null,
+        !entry.resolved ? reviewButton('Escalate', function () { setFlag(r, f, 'escalated'); }) : null));
+  }
+
+  /** Items that go to the reviewer instead of onto the return. */
+  function escalations(r, g) {
+    var list = [];
+    r.items.forEach(function (it) {
+      if (it.escalate && it.value) list.push(TRP.extract.FORMS[it.formId].short + ', ' + itemLabel(it) + ' (' + itemAmount(it) + '): ' + it.escalate);
+      else if (it.status === 'escalated') list.push(TRP.extract.FORMS[it.formId].short + ', ' + itemLabel(it) + ' (' + itemAmount(it) + '): escalated by the preparer. ' + it.reason);
+    });
+    TRP.profile.flags(ctxOf(r)).forEach(function (f) {
+      if (f.level === 'escalate') list.push(f.text);
+      else if (r.flagState[f.id] === 'escalated') list.push(f.text + ' (escalated by the preparer)');
+    });
+    var result = r.result || (g && g.engine);
+    if (result && result.ok) result.notes.forEach(function (n) { list.push(n.text); });
+    return list;
+  }
+
   function renderGate() {
     var r = active();
-    var low = r ? r.items.filter(function (i) { return i.startedLow; }) : [];
-    var done = low.filter(function (i) { return i.status !== 'open'; }).length;
-    $('#gate-label').textContent = done + ' of ' + low.length + ' low-confidence items resolved';
-    $('#gate-fill').style.width = (low.length ? Math.round(100 * done / low.length) : 0) + '%';
+    if (!r) return;
+    var g = gate(r);
+    $('#gate-label').textContent = g.done + ' of ' + g.total + ' low-confidence items resolved';
+    $('#gate-fill').style.width = (g.total ? Math.round(100 * g.done / g.total) : 0) + '%';
     var bar = $('#view-review .progress-bar');
-    bar.setAttribute('aria-valuemax', String(low.length));
-    bar.setAttribute('aria-valuenow', String(done));
+    bar.setAttribute('aria-valuemax', String(g.total));
+    bar.setAttribute('aria-valuenow', String(g.done));
+
+    var low = $('#low-list'), med = $('#medium-list'), esc = $('#escalated-list'), blockers = $('#gate-blockers');
+    low.textContent = ''; med.textContent = ''; esc.textContent = ''; blockers.textContent = '';
+    g.entries.forEach(function (e) { low.appendChild(e.kind === 'item' ? itemCard(r, e.item, 'low') : flagCard(r, e)); });
+    r.items.forEach(function (it) { if (it.confidence === 'medium' && it.status === 'open') med.appendChild(itemCard(r, it, 'medium')); });
+    escalations(r, g).forEach(function (text) {
+      esc.appendChild(el('div', { class: 'review-card is-escalated' }, el('span', {}, text + '.')));
+    });
+    if (g.engine && !g.engine.ok) {
+      var ul = el('ul', {});
+      g.engine.unsupported.forEach(function (u) { ul.appendChild(el('li', {}, u + '.')); });
+      blockers.appendChild(el('div', { class: 'blockers', role: 'status' },
+        el('strong', {}, 'The return cannot be calculated yet. Escalating these does not unlock it; they must be decided:'), ul));
+    }
+    var btn = $('#generate-btn');
+    btn.disabled = !g.canGenerate;
+    btn.textContent = g.canGenerate ? 'Generate Form 1041' : 'Generate Form 1041 · ' + g.why;
+  }
+
+  /* ---------- Calculation and the result screen ---------- */
+
+  var RANK = { high: 3, medium: 2, low: 1 };
+  var LINE_INPUTS = {
+    '1': ['int_1', 'int_3'], '2a': ['div_1a'], '2b': ['div_1b', 'div_1a'],
+    '4': ['b_1d', 'b_1e', 'b_term', 'div_2a', 'prior_stcl', 'prior_ltcl'],
+    '12': ['sum_fees', 'int_8', 'div_12'], '14': ['sum_prof', 'int_8', 'div_12'],
+    dist: ['sum_income_dist', 'sum_principal_dist', 'int_8', 'div_12']
+  };
+
+  /** A line's confidence is the lowest confidence among its inputs. */
+  function lineConfidence(r, keys, withProfile) {
+    var worst = { level: 'high', why: 'Every input is High' };
+    function consider(level, why) { if (RANK[level] < RANK[worst.level]) worst = { level: level, why: why }; }
+    r.items.forEach(function (it) {
+      if (it.value === null) return;
+      if (keys.some(function (k) { return LINE_INPUTS[k].indexOf(it.fieldId) !== -1; })) {
+        consider(it.confidence, 'Lowest input: ' + TRP.extract.FORMS[it.formId].short + ' ' + itemLabel(it) + ' (' + it.reason + ')');
+      }
+    });
+    if (withProfile) {
+      TRP.profile.flags(ctxOf(r)).forEach(function (f) {
+        if (f.level === 'low' && r.flagState[f.id] !== 'confirmed') consider('low', 'Rests on an escalated profile item: ' + f.text);
+      });
+    }
+    return worst;
+  }
+
+  function generate(r) {
+    var g = gate(r);
+    if (!g.canGenerate) return;
+    r.result = g.engine;
+    r.step = 'generate';
+    var F = r.result.form;
+    log('return.generated', {
+      classification: ctxOf(r).a.classification, taxMethod: r.result.taxMethod,
+      lines: { totalIncome: F['9'], adjustedTotalIncome: F['17'], dni: r.result.schB['7'], distributionDeduction: F['18'], exemption: F['21'], taxableIncome: F['23'], totalTax: F['24'] },
+      assumptions: r.result.assumptions, escalated: escalations(r, g), checks: r.result.checks
+    }, r);
+    say(r, [{ type: 'p', text: 'The return is calculated: taxable income ' + TRP.extract.formatMoney(F['23']) + ', total tax ' + TRP.extract.formatMoney(F['24']) + '. It is a draft for professional review.' },
+      { type: 'actions', actions: [{ label: 'Open the result', run: function () { setView('complete'); } }] }]);
+    setView('complete');
+    renderAll();
+  }
+
+  function renderComplete() {
+    var r = active(), box = $('#complete-result');
+    if (!r) return;
+    box.textContent = '';
+    var res = r.result;
+    if (!res) {
+      box.appendChild(el('p', { class: 'muted' }, 'The key lines appear here once the return is generated from the review screen.'));
+      box.appendChild(el('div', { class: 'btn-row' }, reviewButton('Go to the review screen', function () { setView('review'); }, true)));
+      return;
+    }
+    var esc = escalations(r, null), F = res.form, B = res.schB, money = TRP.extract.formatMoney;
+    if (esc.length) box.appendChild(el('p', {}, el('span', { class: 'esc-label' }, 'Contains ' + plural(esc.length, 'escalated item') + ' for the reviewer')));
+
+    var rows = [
+      ['Form 1041, line 1', 'Interest income', F['1'], ['1'], false, '1'],
+      ['Form 1041, line 2a', 'Total ordinary dividends', F['2a'], ['2a'], false, '2a'],
+      ['Form 1041, line 2b(1)', 'Qualified dividends, beneficiaries', F['2b1'], ['2b', 'dist'], true, '2b(1)'],
+      ['Form 1041, line 2b(2)', 'Qualified dividends, trust', F['2b2'], ['2b', 'dist'], true, '2b(2)'],
+      ['Form 1041, line 4', 'Capital gain or (loss)', F['4'], ['4'], false, '4'],
+      ['Form 1041, line 9', 'Total income', F['9'], ['1', '2a', '4'], false, '9'],
+      ['Form 1041, line 12', 'Fiduciary fees', F['12'], ['12'], false, '12'],
+      ['Form 1041, line 14', 'Attorney, accountant and preparer fees', F['14'], ['14'], false, '14'],
+      ['Form 1041, line 17', 'Adjusted total income', F['17'], ['1', '2a', '4', '12', '14'], false, '17'],
+      ['Schedule B, line 7', 'Distributable net income', B['7'], ['1', '2a', '4', '12', '14'], true, '7'],
+      ['Form 1041, line 18', 'Income distribution deduction', F['18'], ['1', '2a', '4', '12', '14', 'dist'], true, '15'],
+      ['Form 1041, line 21', 'Exemption', F['21'], [], true, '21'],
+      ['Form 1041, line 23', 'Taxable income', F['23'], ['1', '2a', '4', '12', '14', 'dist'], true, '23'],
+      ['Form 1041, line 24', 'Total tax', F['24'], ['1', '2a', '2b', '4', '12', '14', 'dist'], true, '24']
+    ].filter(function (row) { return row[2] !== 0 || /line (9|17|18|21|23|24|7)$/.test(row[0]); });
+
+    var body = el('tbody', {});
+    rows.forEach(function (row) {
+      var conf = lineConfidence(r, row[3], row[4]);
+      var step = res.trace.filter(function (s) { return s.line === row[5] && row[0].indexOf(s.form) === 0; })[0];
+      var cite = step && TRP.knowledge.byId[step.source];
+      body.appendChild(el('tr', {},
+        el('td', {}, row[0], el('br', {}), el('span', { class: 'reason' }, row[1])),
+        el('td', { class: 'num' }, money(row[2])),
+        el('td', {}, badge(conf.level), ' ', el('span', { class: 'reason' }, conf.why)),
+        el('td', { class: 'basis' }, step ? step.how : '', cite ? el('span', {}, el('br', {}), 'Source: ' + cite.source + ' · ' + cite.section) : null)));
+    });
+    box.appendChild(el('h3', {}, 'Key lines'));
+    box.appendChild(el('p', { class: 'fine' }, 'Tax method: ' + res.taxMethod + '. Every figure was computed by rule-based code, not by the AI.'));
+    box.appendChild(el('div', { class: 'table-wrap' }, el('table', { class: 'items-table' },
+      el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Line'), el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Confidence'), el('th', { scope: 'col' }, 'Basis'))), body)));
+
+    box.appendChild(el('h3', {}, 'Schedule K-1 amounts'));
+    var kBody = el('tbody', {}), kConf = lineConfidence(r, ['1', '2a', '2b', '4', '12', '14', 'dist'], true);
+    res.k1.forEach(function (k) {
+      kBody.appendChild(el('tr', {},
+        el('td', {}, k.name, el('br', {}), el('span', { class: 'reason' }, Math.round(k.share * 10000) / 100 + '% share')),
+        el('td', { class: 'num' }, money(k['1'])), el('td', { class: 'num' }, money(k['2a'])), el('td', { class: 'num' }, money(k['2b'])),
+        el('td', { class: 'num' }, money(k['3'] + k['4a'])), el('td', { class: 'num' }, money(k['14A']))));
+    });
+    box.appendChild(el('div', { class: 'table-wrap' }, el('table', { class: 'items-table' },
+      el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Beneficiary'), el('th', { scope: 'col', class: 'num' }, 'Box 1 interest'), el('th', { scope: 'col', class: 'num' }, 'Box 2a dividends'),
+        el('th', { scope: 'col', class: 'num' }, 'Box 2b qualified'), el('th', { scope: 'col', class: 'num' }, 'Boxes 3 and 4a gains'), el('th', { scope: 'col', class: 'num' }, 'Box 14A tax-exempt'))), kBody)));
+    box.appendChild(el('p', {}, badge(kConf.level), ' ', el('span', { class: 'reason' }, kConf.why)));
+
+    function listSection(title, items) {
+      if (!items.length) return;
+      box.appendChild(el('h3', {}, title));
+      var ul = el('ul', {});
+      items.forEach(function (text) { ul.appendChild(el('li', {}, /[.?]$/.test(text) ? text : text + '.')); });
+      box.appendChild(ul);
+    }
+    listSection('Method choices the reviewer should check', res.assumptions);
+    listSection('Escalated to the reviewer', esc);
+    box.appendChild(el('p', { class: 'fine' }, 'The filled IRS forms, the review log export and the reviewer sign-off are built in the next milestone.'));
   }
 
   /* ---------- Confirm and edit ---------- */
@@ -988,6 +1257,7 @@
     item.status = 'confirmed';
     item.confidence = 'high';
     item.reason = 'Confirmed by you';
+    invalidate(r);
     recount(r);
     askNext(r);
     renderAll();
@@ -1000,8 +1270,9 @@
     item.confidence = 'high';
     item.reason = 'Entered by you';
     log('item.override', { document: findDoc(r, item.docId).name, item: itemLabel(item), from: before, to: itemAmount(item) }, r);
+    invalidate(r);
     recount(r);
-    state.panel.editing = false;
+    if (state.panel) state.panel.editing = false;
     askNext(r);
     recount(r);
     renderAll();
@@ -1037,7 +1308,7 @@
 
   function renderPanel() {
     var r = active();
-    var open = !!(state.panel && r && state.view === 'chat');
+    var open = !!(state.panel && r && (state.view === 'chat' || state.view === 'review'));
     $('#source-panel').hidden = !open;
     $('#progress').hidden = state.view !== 'chat' || open;
     if (!open) return;
@@ -1295,6 +1566,7 @@
       r.dirty = true;
       recount(r);
       state.panel = null;
+      invalidate(r);
       startProfile(r);
       askNext(r);
       renderAll();
@@ -1439,6 +1711,7 @@
     renderComposer();
     renderLogCount();
     renderGate();
+    renderComplete();
     renderPanel();
   }
 
@@ -1608,6 +1881,7 @@
     });
     $('#review-btn').addEventListener('click', function () { closeDrawers(); setView('review'); });
     $('#rename-btn').addEventListener('click', startRename);
+    $('#generate-btn').addEventListener('click', function () { var r = active(); if (r) generate(r); });
     $('#manual-btn').addEventListener('click', function () { closeDrawers(); openManual(null); });
     $('#source-close').addEventListener('click', closePanel);
     $('#sample-btn').addEventListener('click', loadSample);

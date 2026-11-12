@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261111f">
+<link rel="stylesheet" href="styles.css?v=20261112a">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -155,11 +155,16 @@
         <h2 id="review-title">Before I generate your return</h2>
         <p class="muted">Confirm, correct or escalate every low-confidence item below. Medium items are worth a look but won't block the return.</p>
 
+        <div id="gate-blockers"></div>
+
         <h3>Low confidence</h3>
-        <div class="empty-state" id="low-list">No items yet. Low-confidence items appear here once documents are read.</div>
+        <div class="review-list" id="low-list"></div>
 
         <h3>Medium confidence <span class="optional">optional</span></h3>
-        <div class="empty-state" id="medium-list">No items yet.</div>
+        <div class="review-list" id="medium-list"></div>
+
+        <h3>For the reviewer <span class="optional">escalated</span></h3>
+        <div class="review-list" id="escalated-list"></div>
 
         <h3>How confidence is assigned</h3>
         <ul class="legend">
@@ -176,7 +181,7 @@
             <span class="progress-fill" id="gate-fill" style="width:0%"></span>
           </div>
         </div>
-        <button type="button" class="btn btn-primary" id="generate-btn" disabled>Generate Form 1041 · finish documents and trust profile first</button>
+        <button type="button" class="btn btn-primary" id="generate-btn" disabled>Generate Form 1041</button>
       </div>
     </section>
 
@@ -186,7 +191,7 @@
         <button type="button" class="btn btn-ghost back-btn" data-goto="chat">← Back to conversation</button>
         <h2 id="complete-title">Generate &amp; sign off</h2>
         <p class="draft-banner">DRAFT – for professional review</p>
-        <p class="muted">The completed forms, key lines and reviewer sign-off appear here once the return is generated.</p>
+        <div id="complete-result" class="complete-result"><p class="muted">The key lines appear here once the return is generated from the review screen.</p></div>
 
         <div class="download-grid">
           <div class="card download-card is-locked"><h3>Form 1041</h3><p class="muted">Includes Schedules B and G</p><button type="button" class="btn btn-outline" disabled>Download</button></div>
@@ -299,12 +304,12 @@
 </dialog>
 
 <!-- Classic scripts (no modules) so the app also runs when index.html is opened from disk. -->
-<script src="rules/constants_2025.js?v=20261111f"></script>
-<script src="rules/engine.js?v=20261111f"></script>
-<script src="ai.js?v=20261111f"></script>
-<script src="extract.js?v=20261111f"></script>
-<script src="profile.js?v=20261111f"></script>
-<script src="pdf/fill.js?v=20261111f"></script>
-<script src="app.js?v=20261111f"></script>
+<script src="rules/constants_2025.js?v=20261112a"></script>
+<script src="rules/engine.js?v=20261112a"></script>
+<script src="ai.js?v=20261112a"></script>
+<script src="extract.js?v=20261112a"></script>
+<script src="profile.js?v=20261112a"></script>
+<script src="pdf/fill.js?v=20261112a"></script>
+<script src="app.js?v=20261112a"></script>
 </body>
 </html>

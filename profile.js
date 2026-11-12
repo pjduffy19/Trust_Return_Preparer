@@ -299,33 +299,34 @@
 
   function flags(ctx) {
     var a = ctx.a, out = [];
-    function add(id, level, text) { out.push({ id: id, level: level, text: text }); }
+    // pid: the question to change to clear the flag. confirmable: the user can keep their answer after checking it.
+    function add(id, level, text, pid, confirmable) { out.push({ id: id, level: level, text: text, pid: pid || null, confirmable: !!confirmable }); }
 
     QUESTIONS.forEach(function (q) {
       if (!(q.id in a)) return;
       if (a[q.id] === 'unsure') {
         var heavy = q.id === 'gains_alloc' ? 'The instrument is silent or unclear on capital gains. The reviewer must decide before the return can be generated'
           : 'Not sure: ' + resolve(q, ctx).text.split('?')[0] + '?';
-        add(q.id, 'low', heavy);
+        add(q.id, 'low', heavy, q.id, false);
       }
       var f = q.flag ? q.flag(a[q.id], ctx) : null;
-      if (f) add(q.id, f.level, f.text);
+      if (f) add(q.id, f.level, f.text, q.id, f.level === 'low' && q.id !== 'prior_return' && q.id !== 'tax_exempt');
     });
 
     var c = classify(a);
-    if (!c.pending && !c.decided) add('classification', 'low', 'Simple or complex is undecided, because an answer it depends on is Not sure');
+    if (!c.pending && !c.decided) add('classification', 'low', 'Simple or complex is undecided, because an answer it depends on is Not sure', c.unsure[0], false);
 
     if (a.principal && a.principal !== 'unsure' && ctx.facts.principalDist !== null && (a.principal === 'yes') !== (ctx.facts.principalDist > 0)) {
-      add('principal_doc', 'low', "Your answer on principal distributions disagrees with the trustee's summary (" + money(ctx.facts.principalDist) + ')');
+      add('principal_doc', 'low', "Your answer on principal distributions disagrees with the trustee's summary (" + money(ctx.facts.principalDist) + ')', 'principal', true);
     }
-    if (a.carryover && a.carryover.skipped) add('carryover', 'low', 'Capital loss carryover from ' + (YEAR - 1) + ' is not known');
-    if (a.first_year === 'yes' && ctx.facts.hasPrior) add('first_year_doc', 'low', 'You said this is the first tax year, but a prior-year return was uploaded');
+    if (a.carryover && a.carryover.skipped) add('carryover', 'low', 'Capital loss carryover from ' + (YEAR - 1) + ' is not known', 'carryover', false);
+    if (a.first_year === 'yes' && ctx.facts.hasPrior) add('first_year_doc', 'low', 'You said this is the first tax year, but a prior-year return was uploaded', 'first_year', true);
 
     var bens = a.beneficiaries || [], priorBens = ctx.facts.prior.bens || [];
     if (bens.length && priorBens.length) {
       var now = bens.map(function (b) { return b.name.toLowerCase().trim(); }).sort().join('|');
       var then = priorBens.map(function (n) { return n.toLowerCase().trim(); }).sort().join('|');
-      if (now !== then) add('beneficiaries_prior', 'low', "The beneficiaries differ from last year's K-1s (" + priorBens.join(', ') + ')');
+      if (now !== then) add('beneficiaries_prior', 'low', "The beneficiaries differ from last year's K-1s (" + priorBens.join(', ') + ')', 'beneficiaries', true);
     }
     return out;
   }

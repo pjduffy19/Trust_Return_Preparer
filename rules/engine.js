@@ -81,6 +81,7 @@
     if (!bens.length || Math.abs(shareTotal - 1) > 0.0001) unsupported('Beneficiary shares must add up to 100%');
     if ((input.sales || []).some(function (s) { return s.term !== 'short' && s.term !== 'long'; })) unsupported('A sale is missing its holding period (short-term or long-term)');
     if ((input.sales || []).some(function (s) { return typeof s.proceeds !== 'number' || typeof s.basis !== 'number'; })) unsupported('A sale is missing its proceeds or its basis');
+    (input.blockers || []).forEach(unsupported);
     if (!out.ok) return out;
 
     var interest = num(input.interest), ordDiv = num(input.ordinaryDividends), qd = num(input.qualifiedDividends);
@@ -235,6 +236,12 @@
         else if (it.fieldId === 'b_term') s.term = it.value;
       } else if (typeof it.value === 'number') sum[it.fieldId] = (sum[it.fieldId] || 0) + it.value;
     });
+    // Boxes that change the numbers in ways this tool does not compute. They stop the calculation.
+    var blockers = [];
+    if (sum.div_2b || sum.div_2c || sum.div_2d) blockers.push('Form 1099-DIV boxes 2b, 2c or 2d have amounts, which need the Schedule D Tax Worksheet');
+    items.forEach(function (it) {
+      if ((it.fieldId === 'b_1g' || it.fieldId === 'b_1f') && it.value) blockers.push('A sale has a wash sale or market discount adjustment, which needs Form 8949');
+    });
     var prior = (facts && facts.prior) || {};
     var co = a.carryover && !a.carryover.skipped ? a.carryover : {};
     return {
@@ -250,6 +257,7 @@
       carryover: { st: prior.st != null ? prior.st : co.st || 0, lt: prior.lt != null ? prior.lt : co.lt || 0 },
       fees: sum.sum_fees || 0, profFees: sum.sum_prof || 0,
       incomeDistributed: sum.sum_income_dist || 0, principalDistributed: sum.sum_principal_dist || 0,
+      blockers: blockers.filter(function (b, i) { return blockers.indexOf(b) === i; }),
       beneficiaries: (a.beneficiaries || []).map(function (b) { return { name: b.name, share: b.share / 100 }; })
     };
   }
