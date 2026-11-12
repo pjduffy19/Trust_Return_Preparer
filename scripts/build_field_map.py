@@ -93,12 +93,12 @@ def nearby(ws, rect):
 
 def main():
     out, md = {"_about": "Return line -> IRS PDF field. Built by scripts/build_field_map.py from pdf/fields/*.json. 'printed' is the text beside the field on the form."}, ["# Field map (2025)\n",
-        "Built by `scripts/build_field_map.py`. The last column is the text printed beside each field on the IRS form, copied from the PDF so each row can be checked.\n"]
+        "Built by `scripts/build_field_map.py`. The last three columns are the text printed around each field on the IRS form, copied from the PDF so each row can be checked. Header boxes are labelled above the field; numbered lines are labelled to the left; check boxes are labelled to the right.\n"]
     for form, rows in MAP.items():
         listing = json.load(open(os.path.join(ROOT, "pdf", "fields", form + ".json"), encoding="utf-8"))
         ws = words(FILES[form])
         out[form] = {"file": FILES[form], "fields": {}}
-        md += ["\n## " + FILES[form] + "\n", "| Return line | PDF field | Type | Printed beside the field |", "|---|---|---|---|"]
+        md += ["\n## " + FILES[form] + "\n", "| Return line | PDF field | Type | Printed above the field | Printed to its left | Printed to its right |", "|---|---|---|---|---|---|"]
         for key, short, kind, label in rows:
             suffix = short if short.endswith("]") else short + "[0]"
             hits = [f for f in listing if f["name"].endswith("." + suffix)]
@@ -109,8 +109,7 @@ def main():
                 raise SystemExit(f"{form}: field {short} is a {f['type']}, expected {kind}")
             printed = nearby(ws[f["page"] - 1], f["rect"])
             out[form]["fields"][key] = {"field": f["name"], "type": kind, "label": label, "page": f["page"], "printed": printed}
-            shown = printed["left"] or printed["above"] or printed["right"]
-            md.append(f"| {label} | `{short}` (page {f['page']}) | {kind} | {shown[-80:]} |")
+            md.append(f"| {label} | `{short}` (page {f['page']}) | {kind} | {printed['above'][:60]} | {printed['left'][-70:]} | {printed['right'][:40]} |")
     json.dump(out, open(os.path.join(ROOT, "pdf", "field_map_2025.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     open(os.path.join(ROOT, "pdf", "FIELD_MAP.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
     print("field map written:", {k: len(v["fields"]) for k, v in out.items() if k != "_about"})
