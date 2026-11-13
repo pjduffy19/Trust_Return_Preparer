@@ -160,7 +160,7 @@
     B['15'] = t('Schedule B', 15, 'Income distribution deduction', Math.max(0, Math.min(B['13'], B['14'])), 'The smaller of line 13 (' + B['13'] + ') or line 14 (' + B['14'] + ')', 'f1041-schb');
 
     /* ----- Page 1: distribution deduction, exemption, taxable income ----- */
-    F['18'] = B['15'];
+    F['18'] = t('Form 1041', 18, 'Income distribution deduction', B['15'], 'From Schedule B, line 15', 'f1041-schb');
     F['21'] = t('Form 1041', 21, 'Exemption', input.allIncomeRequired ? C.exemptions.allIncomeRequired : C.exemptions.otherTrust,
       input.allIncomeRequired ? 'The instrument requires all income to be distributed currently' : 'A trust not required to distribute all income currently', 'i1041-exemption');
     F['22'] = r2(F['18'] + F['21']);

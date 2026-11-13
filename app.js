@@ -138,6 +138,7 @@
       pii: {},              // full SSNs and EINs: memory only, never logged, never sent to the AI
       profileStarted: false,
       profileDone: false,
+      openQuestions: [],    // typed questions the sources could not answer; they go to the reviewer
       flagState: {},        // profile flag id -> 'confirmed' | 'escalated'
       result: null,         // the engine's output once the return is generated
       escalated: 0,
@@ -665,6 +666,7 @@
         node = el('div', { class: 'msg msg-assistant' }, el('span', { class: 'sr-only' }, 'Trust Return Preparer: '));
         m.blocks.forEach(function (b) {
           if (b.type === 'p') node.appendChild(el('p', { class: b.small ? 'fine' : null }, b.text));
+          else if (b.type === 'excerpt') node.appendChild(el('blockquote', { class: 'excerpt' }, b.text, el('cite', {}, b.cite)));
           else if (b.type === 'ol' || b.type === 'ul') {
             var list = el(b.type, {});
             b.items.forEach(function (t) { list.appendChild(el('li', {}, t)); });
@@ -720,7 +722,7 @@
     });
     input.disabled = blocked;
     $('#file-input').disabled = !!r && r.blocked;
-    input.placeholder = r && r.busy ? 'Reading documents…' : blocked ? 'Return closed. Start a new one.' : 'Type an answer or drop documents here';
+    input.placeholder = r && r.busy ? 'Reading documents…' : blocked ? 'Return closed. Start a new one.' : 'Ask about the IRS sources, or drop documents here';
     $('#send-btn').disabled = blocked || (!input.value.trim() && !state.pending.length);
   }
 
@@ -755,8 +757,12 @@
       log('documents.uploaded', { files: fresh.map(function (f) { return { name: f.name, bytes: f.size, type: f.type || 'unknown' }; }) });
       processFiles(r, fresh);
     } else if (text && !skipped.length) {
-      say(r, pendingQuestion(r) ? 'Please use the question card above to answer. Nothing you typed was sent to an AI model.'
-        : 'Questions about the return are answered in a later milestone. Nothing you typed was sent to an AI model.');
+      askSources(r, text).then(renderAll, function (err) {
+        r.busy = false;
+        log('question.error', { error: String(err && err.message || err) }, r);
+        say(r, 'Something went wrong while looking that up. Please try again.');
+        renderAll();
+      });
     }
     state.pending = [];
     input.value = '';
@@ -1104,6 +1110,7 @@
       if (f.level === 'escalate') list.push(f.text);
       else if (r.flagState[f.id] === 'escalated') list.push(f.text + ' (escalated by the preparer)');
     });
+    r.openQuestions.forEach(function (q) { list.push('Question the sources could not answer: "' + q + '"'); });
     var result = r.result || (g && g.engine);
     if (result && result.ok) result.notes.forEach(function (n) { list.push(n.text); });
     return list;
@@ -1208,7 +1215,7 @@
       ['Form 1041, line 14', 'Attorney, accountant and preparer fees', F['14'], ['14'], false, '14'],
       ['Form 1041, line 17', 'Adjusted total income', F['17'], ['1', '2a', '4', '12', '14'], false, '17'],
       ['Schedule B, line 7', 'Distributable net income', B['7'], ['1', '2a', '4', '12', '14'], true, '7'],
-      ['Form 1041, line 18', 'Income distribution deduction', F['18'], ['1', '2a', '4', '12', '14', 'dist'], true, '15'],
+      ['Form 1041, line 18', 'Income distribution deduction', F['18'], ['1', '2a', '4', '12', '14', 'dist'], true, '18'],
       ['Form 1041, line 21', 'Exemption', F['21'], [], true, '21'],
       ['Form 1041, line 23', 'Taxable income', F['23'], ['1', '2a', '4', '12', '14', 'dist'], true, '23'],
       ['Form 1041, line 24', 'Total tax', F['24'], ['1', '2a', '2b', '4', '12', '14', 'dist'], true, '24']
@@ -1765,6 +1772,131 @@
     }).catch(function () {
       msg.textContent = 'The sample documents could not be loaded. Open the app from its web address, not from a file on disk.';
     });
+  }
+
+  /* ---------- Questions typed into the message box: answered from the IRS excerpts only ---------- */
+
+  var STOP_WORDS = 'the and for are was were what why how does did this that with from into have has had not but can could should would will its our your their there here then than them they you about which when where who whom whose also any all each much many more most some such only very just out over under between being been does doing done make makes made mean means tell explain give gives need needs know amount enter under get gets got let may might must shall per via use used using trust trusts return returns form irs tax taxes line box'.split(' ');
+
+  function wordsOf(text) {
+    var out = [];
+    (String(text).toLowerCase().match(/[a-z][a-z0-9-]+|\d+[a-z]?/g) || []).forEach(function (w) {
+      if (STOP_WORDS.indexOf(w) !== -1) return;
+      w = w.replace(/(ies)$/, 'y').replace(/([^s])s$/, '$1');
+      if ((w.length > 2 || /^\d\d/.test(w)) && STOP_WORDS.indexOf(w) === -1 && out.indexOf(w) === -1) out.push(w);
+    });
+    return out;
+  }
+
+  /**
+   * Retrieval. Finds the bundled IRS excerpts, and the computed lines of this return, that match
+   * the question. Pure keyword matching: nothing leaves the browser in this step.
+   */
+  function retrieve(r, question) {
+    var terms = wordsOf(question), found = { excerpts: [], facts: [] };
+    var refs = (question.toLowerCase().match(/\b(?:line|box)\s*\d+[a-e]?(?:\(\d\))?/g) || []).map(function (s) { return s.replace(/^(line|box)\s*/, ''); });
+    var all = Object.keys(TRP.knowledge.byId).map(function (id) {
+      var e = TRP.knowledge.byId[id];
+      return { e: e, head: wordsOf(e.section), body: wordsOf(e.text) };
+    });
+    // Rare words count for more than common ones; a word found in no excerpt counts as the rarest.
+    var weight = {};
+    terms.forEach(function (t) {
+      var df = all.filter(function (x) { return x.head.indexOf(t) !== -1 || x.body.indexOf(t) !== -1; }).length;
+      // A word in no excerpt is weighted like a fairly common one, so stray words do not sink a good match.
+      weight[t] = Math.log((all.length + 1) / ((df || all.length / 12) + 0.5));
+    });
+    // With the AI connected, the model also judges whether the sources answer the question, so retrieval can be wider.
+    var need = TRP.ai.getStatus().connected ? 0.34 : 0.5;
+    var scored = [];
+    all.forEach(function (x) {
+      var got = 0, bonus = 0, total = terms.reduce(function (s, t) { return s + weight[t]; }, 0);
+      terms.forEach(function (t) {
+        var inHead = x.head.indexOf(t) !== -1, inBody = x.body.indexOf(t) !== -1;
+        if (inHead || inBody) got += weight[t];
+        if (inHead) bonus += 0.5 * weight[t] / (total || 1);
+      });
+      // An excerpt counts only if it covers at least half of what the question is about.
+      if (total > 0 && got / total >= need) scored.push({ e: x.e, score: got / total + bonus });
+    });
+    if (r.result) {
+      r.result.trace.forEach(function (t) {
+        var label = wordsOf(t.label), hits = terms.filter(function (w) { return label.indexOf(w) !== -1; }).length;
+        if (refs.length ? refs.indexOf(t.line.toLowerCase()) !== -1 : hits >= 2 && hits >= terms.length / 2) {
+          found.facts.push(t);
+          var src = TRP.knowledge.byId[t.source];
+          if (src && !scored.some(function (s) { return s.e === src; })) scored.push({ e: src, score: 0.5 });
+        }
+      });
+      found.facts = found.facts.slice(0, 5);
+    }
+    scored.sort(function (a, b) { return b.score - a.score; });
+    found.excerpts = scored.slice(0, 5).map(function (s) { return s.e; });
+    return found;
+  }
+
+  function factText(t) {
+    return t.form + ', line ' + t.line + ' (' + t.label + '): ' + (typeof t.value === 'number' ? TRP.extract.formatMoney(t.value) : t.value) + '. ' + t.how + '.';
+  }
+
+  var QA_SCHEMA = { type: 'object', required: ['covered', 'answer', 'cited'],
+    properties: { covered: { type: 'boolean' }, answer: { type: 'string' }, cited: { type: 'array', items: { type: 'string' } } } };
+  var QA_SYSTEM = 'You answer a tax preparer\'s question using ONLY the numbered SOURCES and RETURN FACTS given to you. ' +
+    'Never use outside knowledge, never calculate, and never give tax advice or interpret a trust instrument. ' +
+    'If the sources do not answer the question, reply with covered false and an empty answer. ' +
+    'Otherwise answer in at most three plain sentences and list the ids you relied on in "cited". Reply with JSON only.';
+
+  function outsideSources(r, question) {
+    r.openQuestions.push(question);
+    r.outputs = null;
+    recount(r);
+    log('question.escalated', { question: question, reason: 'No bundled IRS excerpt covers it' }, r);
+    return [{ type: 'p', text: "That is outside my sources. I only answer from the bundled IRS forms and instructions, and none of the excerpts covers it, so I won't guess." },
+      { type: 'p', text: 'I have added it to the list for the reviewer.' }];
+  }
+
+  async function askSources(r, question) {
+    question = TRP.ai.redact(question);          // an SSN or EIN typed into a question goes no further
+    var found = retrieve(r, question);
+    log('question.asked', { question: question, excerptsFound: found.excerpts.map(function (e) { return e.id; }), linesFound: found.facts.map(function (t) { return t.form + ' ' + t.line; }) }, r);
+    if (!found.excerpts.length && !found.facts.length) { say(r, outsideSources(r, question)); return; }
+
+    var blocks = null;
+    if (TRP.ai.getStatus().connected) {
+      r.busy = true;
+      var status = { id: 'm' + (++state.msgSeq), role: 'assistant', blocks: [{ type: 'status', text: 'Checking the IRS sources…' }] };
+      r.messages.push(status);
+      renderAll();
+      var ids = {}, lines = [];
+      found.excerpts.forEach(function (e) { ids[e.id] = e; lines.push('[' + e.id + '] ' + e.source + ', ' + e.section + ': ' + e.text); });
+      found.facts.forEach(function (t, i) { ids['fact-' + (i + 1)] = t; lines.push('[fact-' + (i + 1) + '] RETURN FACT: ' + factText(t)); });
+      var res = await TRP.ai.callJson({ purpose: 'Answer a question from the IRS excerpts', system: QA_SYSTEM, schema: QA_SCHEMA,
+        prompt: 'QUESTION: ' + question + '\n\nSOURCES AND RETURN FACTS:\n' + lines.join('\n') + '\n\nReply as {"covered": true, "answer": "...", "cited": ["id", ...]}' });
+      r.messages.splice(r.messages.indexOf(status), 1);
+      r.busy = false;
+      if (res.ok) {
+        // Code, not the model, decides whether the answer stands: every cited id must be one we supplied.
+        var cited = res.data.cited.filter(function (id, i, all) { return ids[id] && all.indexOf(id) === i; });
+        var invented = res.data.cited.filter(function (id) { return !ids[id]; });
+        var valid = res.data.covered && res.data.answer.trim() && cited.length && !invented.length;
+        log('question.checked', { covered: res.data.covered, cited: cited, inventedIds: invented, accepted: !!valid }, r);
+        if (!valid) { say(r, outsideSources(r, question)); return; }
+        blocks = [{ type: 'p', text: res.data.answer.trim() }, { type: 'p', small: true, text: 'Sources:' }];
+        cited.forEach(function (id) {
+          var s = ids[id];
+          blocks.push(s.text ? { type: 'excerpt', text: s.text, cite: s.source + ' · ' + s.section } : { type: 'excerpt', text: factText(s), cite: 'This return, computed by the rules engine' });
+        });
+      }
+    }
+    if (!blocks) {
+      // No AI (or the call failed): show the matching sources word for word and let the user read them.
+      blocks = [{ type: 'p', text: found.facts.length ? 'Here is how this return computed it, and what the bundled IRS sources say:' : 'Here is what the bundled IRS sources say. I am quoting them, not interpreting them:' }];
+      found.facts.forEach(function (t) { blocks.push({ type: 'excerpt', text: factText(t), cite: 'This return, computed by the rules engine' }); });
+      found.excerpts.slice(0, 3).forEach(function (e) { blocks.push({ type: 'excerpt', text: e.text, cite: e.source + ' · ' + e.section }); });
+      blocks.push({ type: 'p', small: true, text: 'If that does not answer it, ask your reviewer. I do not answer from anything else.' });
+    }
+    if (pendingQuestion(r)) blocks.push({ type: 'p', small: true, text: 'To answer my question above, use its card.' });
+    say(r, blocks);
   }
 
   /* ---------- Sidebar, progress panel, log ---------- */
