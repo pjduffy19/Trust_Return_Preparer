@@ -2015,31 +2015,42 @@
   /* ---------- API key UI (first-run card, settings, sidebar) ---------- */
 
   function renderKey(status) {
-    var modelLabel = '';
-    status.models.forEach(function (m) { if (m.id === status.model) modelLabel = m.label; });
-    var message = status.connected && modelLabel ? status.message + ' · ' + modelLabel : status.message;
+    var providers = TRP.ai.providers, provider = providers[status.provider];
+    var message = status.connected && status.modelLabel ? status.message + ' · ' + status.modelLabel + (status.userChose ? '' : ' (automatic)') : status.message;
 
     $$('[data-key-form]').forEach(function (form) {
+      var pick = $('[data-provider-select]', form);
+      if (!pick.options.length) {
+        Object.keys(providers).forEach(function (id) { pick.appendChild(el('option', { value: id }, providers[id].label)); });
+      }
+      pick.value = status.provider;
+      pick.disabled = status.state === 'connecting';
+      $('[data-provider-note]', form).textContent = provider.note || '';
+      var help = $('[data-key-help]', form);
+      help.href = provider.keyHelpUrl;
+      help.textContent = provider.keyHelpText;
+      $('[data-key-label]', form).textContent = provider.label + ' API key';
       $('[data-key-dot]', form).setAttribute('data-state', status.state);
       $('[data-key-message]', form).textContent = message;
       var btn = $('[data-key-submit]', form);
       btn.disabled = status.state === 'connecting';
       btn.textContent = status.state === 'connecting' ? 'Checking…' : status.connected ? 'Replace key' : 'Connect';
       var input = $('[data-key-input]', form);
-      input.placeholder = status.connected ? 'Key connected (hidden)' : 'Paste your key';
+      input.placeholder = status.connected ? 'Key connected (hidden)' : provider.keyPlaceholder;
       if (status.connected) input.value = '';
+
+      var select = $('[data-model-select]', form);
+      select.textContent = '';
+      select.appendChild(el('option', { value: 'auto', selected: !status.userChose }, 'Automatic (fast model, switches if busy)'));
+      status.models.forEach(function (m) {
+        select.appendChild(el('option', { value: m.id, selected: status.userChose && m.id === status.model }, m.label));
+      });
+      $('[data-model-row]', form).hidden = !status.connected;
     });
 
     $('#key-status-btn').setAttribute('data-state', status.state);
-    $('#key-status-text').textContent = 'API key · ' + (status.connected ? 'Connected'
+    $('#key-status-text').textContent = 'API key · ' + (status.connected ? 'Connected · ' + provider.label.replace(/ \(.*\)$/, '')
       : status.state === 'connecting' ? 'Checking…' : 'Not connected');
-
-    var select = $('#model-select');
-    select.textContent = '';
-    status.models.forEach(function (m) {
-      select.appendChild(el('option', { value: m.id, selected: m.id === status.model }, m.label));
-    });
-    $('#model-row').hidden = !status.connected;
     $('#disconnect-btn').hidden = !status.connected;
   }
 
@@ -2047,11 +2058,25 @@
     $$('[data-key-form]').forEach(function (form) {
       form.addEventListener('submit', function (e) {
         e.preventDefault();
-        TRP.ai.connect($('[data-key-input]', form).value);
+        TRP.ai.connect($('[data-key-input]', form).value, $('[data-provider-select]', form).value);
       });
+      $('[data-provider-select]', form).addEventListener('change', function (e) {
+        var id = e.target.value, st = TRP.ai.getStatus();
+        if (st.connected && id !== st.provider) {
+          // Switching providers needs that provider's key. Until it is connected, the current one stays in use.
+          var p = TRP.ai.providers[id];
+          $('[data-provider-note]', form).textContent = 'To switch, paste your ' + p.label + ' key and press Replace key. ' + (p.note || '');
+          $('[data-key-label]', form).textContent = p.label + ' API key';
+          $('[data-key-input]', form).placeholder = p.keyPlaceholder;
+          var help = $('[data-key-help]', form); help.href = p.keyHelpUrl; help.textContent = p.keyHelpText;
+          $('[data-key-input]', form).focus();
+          return;
+        }
+        TRP.ai.selectProvider(id);
+      });
+      $('[data-model-select]', form).addEventListener('change', function (e) { TRP.ai.setModel(e.target.value); });
     });
     $('#disconnect-btn').addEventListener('click', function () { TRP.ai.disconnect(); });
-    $('#model-select').addEventListener('change', function (e) { TRP.ai.setModel(e.target.value); });
     TRP.ai.onStatus(renderKey);
     renderKey(TRP.ai.getStatus());
   }

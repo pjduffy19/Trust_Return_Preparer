@@ -439,7 +439,10 @@ a { color: var(--accent); }
 }
 .key-card-text { flex: 1; min-width: 0; }
 .key-card-title { display: block; font-weight: 600; margin-bottom: 2px; }
-.key-card .key-row { flex: 0 0 310px; max-width: 100%; }
+.key-card .key-fields { flex: 0 0 330px; max-width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.key-card .model-row { margin: 0; }
+.key-card .model-row .field-label { margin-top: 0; }
+.key-card [data-provider-note]:empty { display: none; }
 .key-card .key-line { margin: 6px 0 0; font-size: 13px; }
 .dropzone {
   width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -493,7 +496,7 @@ textarea.input { resize: vertical; font: inherit; }
 .complete-result .signoff { gap: 6px; }
 @media (max-width: 820px) {
   .key-card { flex-direction: column; align-items: stretch; }
-  .key-card .key-row { flex: none; }
+  .key-card .key-fields { flex: none; }
   .download-grid { grid-template-columns: minmax(0, 1fr); }
   .topbar-status { display: none; }
 }

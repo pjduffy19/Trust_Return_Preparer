@@ -16,15 +16,22 @@ The AI reads documents and helps answer questions from the IRS sources. **All ta
 4. Click **Open the review screen**, then **Generate Form 1041**.
 5. Download the filled Form 1041, Schedule D, the Schedule K-1s and the review log, and record a reviewer sign-off.
 
-Everything above works with no API key. A key adds the second, AI read of each document and plain-language answers to questions.
+Everything above works with no API key. A key from Google Gemini, OpenAI, Anthropic or OpenRouter adds the second, AI read of each document and plain-language answers to questions.
 
-## Get a free Gemini API key (optional)
+## Connect an AI model (optional)
 
-1. Go to https://aistudio.google.com/app/apikey and sign in with a Google account.
-2. Create an API key and copy it. Google may change the exact steps on that page.
-3. Paste it into the key box on the app's first screen, or under **Settings & sources**, and press **Connect**.
+Choose a provider on the first screen or under **Settings & sources**, paste your own API key, and press **Connect**. The app checks the key, lists the models that key can use, and shows a **Model** menu.
 
-The key is kept in that browser tab's session storage, sent only to Google's Gemini API, and cleared when the tab closes. It is never in the code or the repository. The free tier has rate limits; if a model is busy the app moves to another one and, failing that, keeps the rule-based read.
+| Provider | Get a key | Notes |
+|---|---|---|
+| Google Gemini (default) | https://aistudio.google.com/app/apikey | Free tier available |
+| OpenAI | https://platform.openai.com/api-keys | Paid. OpenAI does not always accept calls made directly from a web page; if the app reports that it could not reach OpenAI, use OpenRouter for the same models |
+| Anthropic Claude | https://console.anthropic.com/settings/keys | Paid. Called with Anthropic's opt-in header for direct browser access |
+| OpenRouter | https://openrouter.ai/settings/keys | One key for models from many companies, including some free ones |
+
+**Choosing a model.** "Automatic" picks a fast, inexpensive model from your key's list (for example Flash-Lite, a "mini" model or Haiku) and, if it is busy, tries up to two others. A model you pick yourself is always used as chosen; if it fails, that item falls back to the rule-based read instead of a different model.
+
+The key is kept in that browser tab's session storage, sent only to the provider you chose, and cleared when the tab closes. It is never in the code or the repository. To switch providers, pick the new one, paste its key and press **Replace key**; the current connection stays in use until the new key is accepted. Each provider's pages may change their exact steps.
 
 ## How it works
 
@@ -78,15 +85,16 @@ Type a question into the message box. The app searches the bundled IRS excerpts 
 | Structured AI output | Every AI call returns JSON at temperature 0, validated against a schema in code. A bad reply is retried once, then the item falls back to the rule-based read or manual entry. |
 | Confidence from checks | High, Medium and Low come from code comparing two reads and running validation rules. The model never rates itself. |
 | Human gates | The user confirms the classification; every Low item must be resolved; a reviewer signs off. Escalating an undecided fact does not unlock the return. |
-| Privacy | SSNs and EINs are redacted from all text before it is sent to the AI, masked on screen (last 4 digits), masked on the displayed source page, and kept out of the log. They are written only onto the downloaded PDFs. |
+| Privacy | The API key goes only to the provider the user chose. SSNs and EINs are redacted from all text before it is sent to the AI, masked on screen (last 4 digits), masked on the displayed source page, and kept out of the log. They are written only onto the downloaded PDFs. |
 | Traceability | The review log records every document, read, AI call, confidence change, override, answer, escalation, the classification and its rule, the result and the sign-off. It exports as PDF and JSON. |
+| Provider choice | Every model call goes through one adapter (`ai.js`) with the same redaction, schema checks, timeouts and retry rules, whichever provider or model is chosen. |
 | Works without AI | With no key, or when a call fails, the parser, manual entry, the questions, the engine and the outputs all still work. |
 
 ## What this app will not do
 
 | It will not | How that is enforced |
 |---|---|
-| File anything with the IRS | There is no filing code. The app's only network calls are to the AI provider, two pinned libraries on a CDN, a web font, and its own files. |
+| File anything with the IRS | There is no filing code. The app's only network calls are to the AI provider the user chose, two pinned libraries on a CDN, a web font, and its own files. |
 | Send K-1s to beneficiaries | Outputs are downloads to the user's own device. Nothing is emailed or uploaded. |
 | Interpret the trust instrument on its own | The user states what the instrument says. "Silent or not sure" becomes a Low item, and the engine refuses to compute until it is decided. |
 | Make tax elections | The 663(b) and 643(e)(3) questions record what the fiduciary decided and escalate a Yes. The election boxes on the form are never checked. |
@@ -140,7 +148,9 @@ Cases 2, 3 and 5 use the case 1 documents with different answers in the intervie
 
 **General**
 - Nothing is saved. Closing or reloading the tab ends the session, after a warning.
-- The AI read depends on a third-party model that can be slow, busy or changed by its provider.
+- The AI read depends on a third-party model that can be slow, busy or changed by its provider. Quality varies by model; small models can misread a box, which the second read and the checks are there to catch.
+- OpenAI may refuse calls made directly from a web page. OpenRouter reaches the same models.
+- The app has been tested against simulated replies from each provider. Only Google Gemini has been tried with a real key.
 - This is a course prototype. It has not been reviewed by a tax professional and must not be used for a real return.
 
 ## Run it, change it, deploy it
@@ -170,10 +180,10 @@ There is no build step. The empty `.nojekyll` file tells Pages to serve the file
 |---|---|---|
 | Returns, documents, answers, results, the log | Memory in the tab | Until the tab closes or reloads |
 | Full SSNs and EINs | Memory in the tab, and the PDFs you download | Until the tab closes |
-| API key | The tab's `sessionStorage` | Until the tab closes |
+| API key, provider and model choice | The tab's `sessionStorage` | Until the tab closes |
 | Light or dark theme | `localStorage` | Until you change it |
 
-What leaves the browser: redacted document text and typed questions go to the AI provider when a key is connected. Nothing else is sent anywhere.
+What leaves the browser: redacted document text and typed questions go to the AI provider you chose, when a key is connected. Nothing else is sent anywhere.
 
 ## Repository layout
 
@@ -181,7 +191,7 @@ What leaves the browser: redacted document text and typed questions go to the AI
 index.html                 the app shell: first run, conversation, review, result
 styles.css                 light and dark themes
 app.js                     interface, conversation flow, review gate, outputs, session state
-ai.js                      AI provider adapter, schema validation, SSN/EIN redaction
+ai.js                      AI providers (Gemini, OpenAI, Anthropic, OpenRouter), schema validation, SSN/EIN redaction
 extract.js                 document reading: classify, parse, AI read, checks, confidence
 profile.js                 trust questions, the simple-trust rule, scope and reviewer flags
 rules/engine.js            the tax calculation
@@ -207,5 +217,5 @@ All in `sources/`, from irs.gov: Form 1041 (2025) and its instructions; Schedule
 - **Documents first.** The user uploads documents, then answers what they cannot show, as in the approved mockup. This reversed the order in the original build prompt.
 - **Scans never go to the AI,** because an image cannot be redacted for SSNs and EINs.
 - **Escalating does not unlock.** An undecided fact that the calculation needs keeps Generate locked even after it is escalated.
-- **Flash-Lite model by default,** with the model's "thinking" kept to a minimum. Reading printed amounts needs no reasoning, and the larger models were slow and often busy.
+- **Bring your own provider and model.** Gemini stays the default because it has a free tier. "Automatic" prefers small, fast models with their reasoning kept to a minimum, because reading printed amounts needs no reasoning and the larger models were slow and often busy.
 - **A stored-only zip** is written by the app itself, so no compression library is needed.

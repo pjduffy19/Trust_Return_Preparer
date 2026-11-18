@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261113a">
+<link rel="stylesheet" href="styles.css?v=20261118a">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -73,17 +73,27 @@
 
         <form class="key-card key-form" data-key-form novalidate>
           <div class="key-card-text">
-            <label class="key-card-title" for="first-key-input">Connect your own API key <span class="optional">optional</span></label>
-            <p class="fine">Kept in this tab only. Never sent anywhere except the AI provider. Without a key, you enter values yourself.
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a free Gemini key</a>.</p>
+            <span class="key-card-title" id="first-key-title">Connect your own AI model <span class="optional">optional</span></span>
+            <p class="fine">Choose a provider and paste your own key. It is kept in this tab only and sent only to that provider. Without a key, you enter values yourself.
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" data-key-help>Get a free Gemini key</a>.</p>
+            <p class="fine" data-provider-note></p>
             <p class="key-line" data-key-line aria-live="polite">
               <span class="status-dot" data-key-dot data-state="disconnected" aria-hidden="true"></span>
               <span data-key-message>No API key connected</span>
             </p>
           </div>
-          <div class="key-row">
-            <input class="input" id="first-key-input" data-key-input type="password" autocomplete="off" spellcheck="false" placeholder="Paste API key">
-            <button type="submit" class="btn btn-primary" data-key-submit>Connect</button>
+          <div class="key-fields">
+            <label class="sr-only" for="first-provider">AI provider</label>
+            <select class="input" id="first-provider" data-provider-select aria-describedby="first-key-title"></select>
+            <div class="key-row">
+              <label class="sr-only" for="first-key-input" data-key-label>API key</label>
+              <input class="input" id="first-key-input" data-key-input type="password" autocomplete="off" spellcheck="false" placeholder="Paste API key">
+              <button type="submit" class="btn btn-primary" data-key-submit>Connect</button>
+            </div>
+            <div class="model-row" data-model-row hidden>
+              <label class="field-label" for="first-model">Model</label>
+              <select class="input" id="first-model" data-model-select></select>
+            </div>
           </div>
         </form>
 
@@ -242,22 +252,27 @@
     </fieldset>
 
     <form class="setting key-form" data-key-form novalidate>
-      <h3>AI provider</h3>
-      <label class="field-label" for="settings-key-input">Google Gemini API key</label>
+      <h3>AI provider and model</h3>
+      <label class="field-label" for="settings-provider">Provider</label>
+      <select class="input" id="settings-provider" data-provider-select></select>
+      <p class="fine" data-provider-note></p>
+      <label class="field-label" for="settings-key-input" data-key-label>API key</label>
       <div class="key-row">
         <input class="input" id="settings-key-input" data-key-input type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key">
         <button type="submit" class="btn btn-primary" data-key-submit>Connect</button>
       </div>
+      <p class="fine"><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" data-key-help>Get a free Gemini key</a></p>
       <p class="key-line" data-key-line aria-live="polite">
         <span class="status-dot" data-key-dot data-state="disconnected" aria-hidden="true"></span>
         <span data-key-message>No API key connected</span>
       </p>
-      <div class="model-row" id="model-row" hidden>
-        <label class="field-label" for="model-select">Model</label>
-        <select class="input" id="model-select"></select>
+      <div class="model-row" data-model-row hidden>
+        <label class="field-label" for="settings-model">Model</label>
+        <select class="input" id="settings-model" data-model-select></select>
+        <p class="fine">"Automatic" picks a fast model and switches to another if it is busy. A model you pick is always used as chosen.</p>
       </div>
       <button type="button" class="btn btn-outline" id="disconnect-btn" hidden>Disconnect and clear key</button>
-      <p class="fine">Session storage only. Sent only to the provider. SSNs and EINs are redacted from anything sent to the model.</p>
+      <p class="fine">Session storage only. Sent only to the provider you choose. SSNs and EINs are redacted from anything sent to the model.</p>
     </form>
 
     <div class="setting">
@@ -287,12 +302,12 @@
 </dialog>
 
 <!-- Classic scripts (no modules) so the app also runs when index.html is opened from disk. -->
-<script src="rules/constants_2025.js?v=20261113a"></script>
-<script src="rules/engine.js?v=20261113a"></script>
-<script src="ai.js?v=20261113a"></script>
-<script src="extract.js?v=20261113a"></script>
-<script src="profile.js?v=20261113a"></script>
-<script src="pdf/fill.js?v=20261113a"></script>
-<script src="app.js?v=20261113a"></script>
+<script src="rules/constants_2025.js?v=20261118a"></script>
+<script src="rules/engine.js?v=20261118a"></script>
+<script src="ai.js?v=20261118a"></script>
+<script src="extract.js?v=20261118a"></script>
+<script src="profile.js?v=20261118a"></script>
+<script src="pdf/fill.js?v=20261118a"></script>
+<script src="app.js?v=20261118a"></script>
 </body>
 </html>
