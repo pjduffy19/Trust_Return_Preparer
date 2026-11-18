@@ -278,7 +278,16 @@
     { id: 'q13_digital', section: 'Other information', type: 'choice', source: 'i1041-digital', options: YES_NO, unsure: true,
       text: 'In ' + YEAR + ', did the trust receive, sell, exchange or otherwise dispose of a digital asset?',
       why: 'It is question 13.', when: later,
-      flag: escalateIfYes('Digital asset transactions (question 13) are outside this tool') }
+      flag: escalateIfYes('Digital asset transactions (question 13) are outside this tool') },
+
+    /* Only after opening a progress file that was saved without the identifying numbers */
+    { id: 'reenter_ids', section: 'Identifying numbers', type: 'reenter', source: 'i1041-ein',
+      text: 'This return was opened from a file saved without its identifying numbers. Please enter them again.',
+      why: 'Full SSNs and EINs were removed when the file was saved. They are needed only on the final IRS forms.',
+      when: function (ctx) {
+        var a = ctx.a, pii = ctx.pii || {};
+        return later(ctx) && ((!!a.ein && !pii.ein) || (!!a.beneficiaries && !(pii.beneficiaries && pii.beneficiaries.length === a.beneficiaries.length)));
+      } }
   ];
 
   var BY_ID = {};

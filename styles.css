@@ -598,6 +598,16 @@ textarea.input { resize: vertical; font: inherit; }
 .esc-label { display: inline-block; font-size: 12px; font-weight: 600; color: var(--med-fg); background: var(--med-bg); border-radius: 999px; padding: 4px 10px; }
 .items-table td.basis { font-size: 13px; color: var(--text-muted); }
 
+/* ---------- Save progress ---------- */
+.save-btn { gap: 6px; flex: none; }
+.save-body { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
+.save-body .setting { padding: 4px 0; border: 0; }
+.save-body .q-check { align-items: flex-start; padding: 6px 0; line-height: 1.45; }
+.save-body .q-check input { margin-top: 2px; flex: none; }
+.first-links { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; color: var(--text-muted); }
+#load-msg:empty, #sample-msg:empty { display: none; }
+@media (max-width: 820px) { .save-btn { padding: 0 10px; } }
+
 /* ---------- Rename and masking ---------- */
 .topbar-title { flex: 0 1 auto; }
 .rename-btn { width: 36px; height: 36px; color: var(--text-muted); margin-right: auto; }

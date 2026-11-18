@@ -76,6 +76,16 @@ Type a question into the message box. The app searches the bundled IRS excerpts 
 - **Without a key,** the app quotes the matching excerpts word for word.
 - **If nothing matches,** it says the question is outside its sources and adds it to the reviewer's list. It never answers from general knowledge.
 
+## Saving progress
+
+Refreshing or closing the tab ends the session, so the app warns first. To keep a return, press **Save progress** at the top of the return. It downloads a file to your computer; nothing is uploaded. **Open a saved return** (in the sidebar and on the first screen) brings it back in any browser, on any day.
+
+The save dialog warns that the file can contain sensitive information and lets the user decide what goes in it:
+
+- **SSNs and EINs: remove them (the default) or keep them.** Removed numbers keep only their last 4 digits. When the file is opened, the app asks for the full numbers again, checks each against its last 4 digits, and will not generate the return until they are entered. A file that keeps them has `CONTAINS_SSN_EIN` in its name.
+- **Uploaded documents: left out by default.** If left out, every value read from them is kept, but their pages cannot be shown in the source panel. If included, the pages and highlights work as before.
+- The file always contains names, addresses, amounts, answers and the review log. Saving and opening are both recorded in the log.
+
 ## Controls
 
 | Control | How it is enforced |
@@ -85,6 +95,7 @@ Type a question into the message box. The app searches the bundled IRS excerpts 
 | Structured AI output | Every AI call returns JSON at temperature 0, validated against a schema in code. A bad reply is retried once, then the item falls back to the rule-based read or manual entry. |
 | Confidence from checks | High, Medium and Low come from code comparing two reads and running validation rules. The model never rates itself. |
 | Human gates | The user confirms the classification; every Low item must be resolved; a reviewer signs off. Escalating an undecided fact does not unlock the return. |
+| Saved files | Saving is always the user's choice, to a file on their own computer. SSNs, EINs and documents are left out unless the user chooses to keep them, after a warning. A return opened without its numbers cannot be generated until they are re-entered and match their last 4 digits. |
 | Privacy | The API key goes only to the provider the user chose. SSNs and EINs are redacted from all text before it is sent to the AI, masked on screen (last 4 digits), masked on the displayed source page, and kept out of the log. They are written only onto the downloaded PDFs. |
 | Traceability | The review log records every document, read, AI call, confidence change, override, answer, escalation, the classification and its rule, the result and the sign-off. It exports as PDF and JSON. |
 | Provider choice | Every model call goes through one adapter (`ai.js`) with the same redaction, schema checks, timeouts and retry rules, whichever provider or model is chosen. |
@@ -147,7 +158,7 @@ Cases 2, 3 and 5 use the case 1 documents with different answers in the intervie
 - Matching is by keywords. An oddly worded question can miss an excerpt that would have answered it.
 
 **General**
-- Nothing is saved. Closing or reloading the tab ends the session, after a warning.
+- Nothing is kept automatically. Closing or reloading the tab ends the session, after a warning, unless the return was saved to a file. A saved file is not encrypted.
 - The AI read depends on a third-party model that can be slow, busy or changed by its provider. Quality varies by model; small models can misread a box, which the second read and the checks are there to catch.
 - OpenAI may refuse calls made directly from a web page. OpenRouter reaches the same models.
 - The app has been tested against simulated replies from each provider. Only Google Gemini has been tried with a real key.
@@ -179,6 +190,7 @@ There is no build step. The empty `.nojekyll` file tells Pages to serve the file
 | Data | Where | For how long |
 |---|---|---|
 | Returns, documents, answers, results, the log | Memory in the tab | Until the tab closes or reloads |
+| A saved progress file | Your computer, where you save it | Until you delete it. Contains SSNs, EINs and documents only if you chose to keep them |
 | Full SSNs and EINs | Memory in the tab, and the PDFs you download | Until the tab closes |
 | API key, provider and model choice | The tab's `sessionStorage` | Until the tab closes |
 | Light or dark theme | `localStorage` | Until you change it |
@@ -218,4 +230,5 @@ All in `sources/`, from irs.gov: Form 1041 (2025) and its instructions; Schedule
 - **Scans never go to the AI,** because an image cannot be redacted for SSNs and EINs.
 - **Escalating does not unlock.** An undecided fact that the calculation needs keeps Generate locked even after it is escalated.
 - **Bring your own provider and model.** Gemini stays the default because it has a free tier. "Automatic" prefers small, fast models with their reasoning kept to a minimum, because reading printed amounts needs no reasoning and the larger models were slow and often busy.
+- **Saving is a file the user controls,** not browser storage, so nothing stays on the computer unless the user chooses to keep it. Sensitive numbers and documents are left out by default.
 - **A stored-only zip** is written by the app itself, so no compression library is needed.

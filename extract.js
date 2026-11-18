@@ -565,6 +565,7 @@
     field: function (id) { return FIELD_INDEX[id]; },
     isAccepted: isAccepted,
     loadPdfjs: loadPdfjs,
+    openPdf: readPdf,
     processFile: processFile,
     formatMoney: formatMoney,
     show: show,

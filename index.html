@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261118a">
+<link rel="stylesheet" href="styles.css?v=20261118b">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
@@ -32,6 +32,8 @@
     <button type="button" class="btn btn-outline btn-block" id="new-return-btn">
       <span aria-hidden="true">+</span> New return
     </button>
+    <button type="button" class="btn btn-ghost btn-block side-link" id="load-btn">Open a saved return</button>
+    <input type="file" id="load-input" class="sr-only" accept=".json,application/json" tabindex="-1" aria-hidden="true">
 
     <nav class="return-nav" aria-label="This session's returns">
       <h2 class="side-heading">Recent returns</h2>
@@ -62,6 +64,10 @@
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       </button>
       <span class="topbar-status" id="topbar-status" hidden></span>
+      <button type="button" class="btn btn-outline btn-sm save-btn" id="save-btn" hidden>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        Save progress
+      </button>
       <button type="button" class="btn btn-ghost only-narrow-progress" id="open-progress-btn" aria-controls="progress" aria-expanded="false" hidden>Progress</button>
     </header>
 
@@ -114,8 +120,13 @@
         </form>
 
         <p class="sample-line">
-          <button type="button" class="link-btn" id="sample-btn">Try the sample documents</button>
+          <span class="first-links">
+            <button type="button" class="link-btn" id="sample-btn">Try the sample documents</button>
+            <span aria-hidden="true">·</span>
+            <button type="button" class="link-btn" id="first-load-btn">Open a saved return</button>
+          </span>
           <span class="fine" id="sample-msg" aria-live="polite"></span>
+          <span class="fine" id="load-msg" role="status"></span>
         </p>
 
         <ul class="tags" aria-label="Scope">
@@ -150,7 +161,7 @@
             </button>
           </div>
         </form>
-        <p class="footer-note">Synthetic data only · DRAFT – for professional review · Nothing is filed with the IRS · Nothing is saved after this tab closes</p>
+        <p class="footer-note">Synthetic data only · DRAFT – for professional review · Nothing is filed with the IRS · Nothing is kept after this tab closes unless you save progress to a file</p>
       </div>
 
       <div class="drop-overlay" id="drop-overlay" hidden aria-hidden="true">
@@ -289,6 +300,35 @@
   </div>
 </dialog>
 
+<!-- ============ Save progress ============ -->
+<dialog class="dialog" id="save-dialog" aria-labelledby="save-title">
+  <div class="dialog-head">
+    <h2 id="save-title">Save progress</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">✕</button>
+  </div>
+  <div class="dialog-body save-body">
+    <p>This saves the return to a file on your computer, so you can open it again later with <strong>Open a saved return</strong>. Nothing is uploaded.</p>
+    <div class="notice" role="note">
+      <strong>The file can contain sensitive information.</strong>
+      It always includes the trust's and beneficiaries' names and addresses, the amounts, your answers and the review log. Anyone who opens the file can read them.
+    </div>
+    <fieldset class="setting" id="save-numbers-set">
+      <legend>SSNs and EINs</legend>
+      <label class="q-check"><input type="radio" name="save-numbers" value="remove" checked> <span><strong>Remove them</strong> (recommended). The last 4 digits are kept, and you will be asked for the full numbers when you open the file.</span></label>
+      <label class="q-check"><input type="radio" name="save-numbers" value="keep"> <span><strong>Keep them</strong> in the file, in full.</span></label>
+    </fieldset>
+    <div class="setting" id="save-docs-row">
+      <label class="q-check"><input type="checkbox" id="save-docs"> <span><strong>Include the uploaded documents.</strong> They can show identifying numbers and account details. If left out, every value read from them is kept, but their pages cannot be shown.</span></label>
+    </div>
+    <p class="mask-warning" id="save-warning" role="alert" hidden></p>
+    <p class="form-error" id="save-error" role="alert"></p>
+    <div class="btn-row">
+      <button type="button" class="btn btn-primary" id="save-confirm">Save file</button>
+      <button type="button" class="btn btn-outline" data-close-dialog>Cancel</button>
+    </div>
+  </div>
+</dialog>
+
 <!-- ============ Session log ============ -->
 <dialog class="dialog" id="log-dialog" aria-labelledby="log-title">
   <div class="dialog-head">
@@ -302,12 +342,12 @@
 </dialog>
 
 <!-- Classic scripts (no modules) so the app also runs when index.html is opened from disk. -->
-<script src="rules/constants_2025.js?v=20261118a"></script>
-<script src="rules/engine.js?v=20261118a"></script>
-<script src="ai.js?v=20261118a"></script>
-<script src="extract.js?v=20261118a"></script>
-<script src="profile.js?v=20261118a"></script>
-<script src="pdf/fill.js?v=20261118a"></script>
-<script src="app.js?v=20261118a"></script>
+<script src="rules/constants_2025.js?v=20261118b"></script>
+<script src="rules/engine.js?v=20261118b"></script>
+<script src="ai.js?v=20261118b"></script>
+<script src="extract.js?v=20261118b"></script>
+<script src="profile.js?v=20261118b"></script>
+<script src="pdf/fill.js?v=20261118b"></script>
+<script src="app.js?v=20261118b"></script>
 </body>
 </html>

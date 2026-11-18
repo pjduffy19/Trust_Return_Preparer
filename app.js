@@ -118,6 +118,14 @@
     });
   }
 
+  /** Buttons in the conversation name their action, so a saved conversation keeps working buttons. */
+  function runAction(a) {
+    if (a.run) return a.run();
+    if (a.act === 'review') setView('review');
+    else if (a.act === 'complete') setView('complete');
+    else if (a.act === 'manual') openManual(a.arg);
+  }
+
   /* ---------- Returns ---------- */
 
   function newReturn() {
@@ -377,6 +385,30 @@
         });
         if (bad) return fail('Enter an amount such as 3,000.00, or 0.', bad.i);
         submit(v, ins.map(function (x) { return x.f.label + ' ' + TRP.extract.formatMoney(v[x.f.key]); }).join('; '));
+      };
+    } else if (def.type === 'reenter') {
+      // After opening a progress file saved without them: the full numbers, checked against the last 4 digits kept in the file.
+      var a = ctxOf(r).a, wanted = [];
+      var needBens = a.beneficiaries && !(r.pii.beneficiaries && r.pii.beneficiaries.length === a.beneficiaries.length);
+      if (a.ein && !r.pii.ein) wanted.push({ key: 'ein', label: "The trust's EIN", masked: a.ein, kind: 'ein' });
+      if (needBens) a.beneficiaries.forEach(function (b, i) { wanted.push({ key: 'b' + i, label: b.name + "'s identifying number", masked: b.tin, kind: 'ssn' }); });
+      var boxes = wanted.map(function (w) {
+        var input = draftInput(q, w.key, { type: 'password', inputmode: 'numeric', maxlength: '11', placeholder: w.kind === 'ein' ? '00-0000000' : '000-00-0000' });
+        return { w: w, input: input, node: labelled(w.label + ' (ends in ' + String(w.masked).slice(-4) + ')', input) };
+      });
+      body.push(el('div', { class: 'q-grid' }, boxes.map(function (b) { return b.node; }).reduce(function (wrap, nd) { wrap.appendChild(nd); return wrap; }, el('div', { class: 'q-grid-inner' }))));
+      onSave = function () {
+        var ein = null, bens = [];
+        for (var i = 0; i < boxes.length; i++) {
+          var b = boxes[i], digits = nineDigits(b.input.value);
+          if (!digits) return fail('Enter nine digits for ' + b.w.label.replace(/^The /, 'the ') + '.', b.input);
+          if (digits.slice(-4) !== String(b.w.masked).slice(-4)) return fail(b.w.label + ' does not match the saved number ending in ' + String(b.w.masked).slice(-4) + '.', b.input);
+          if (b.w.key === 'ein') ein = digits; else bens.push(digits);
+        }
+        if (ein) r.pii.ein = ein;
+        if (bens.length) r.pii.beneficiaries = bens;
+        q.draft = {};
+        submit('reentered', 'Re-entered ' + plural(boxes.length, 'identifying number'));
       };
     } else if (def.type === 'beneficiaries') {
       if (!q.draft.rows) q.draft.rows = [{}, {}];
@@ -638,7 +670,7 @@
     var g = gate(r);
     blocks.push({ type: 'p', text: g.canGenerate ? 'Nothing is blocking the return. Open the review screen to look over the Medium items and generate it.'
       : 'Next, open the review screen: ' + g.why.replace(/ first$/, '') + ', then generate the return.' });
-    blocks.push({ type: 'actions', actions: [{ label: 'Open the review screen', run: function () { setView('review'); } }] });
+    blocks.push({ type: 'actions', actions: [{ label: 'Open the review screen', act: 'review' }] });
     say(r, blocks);
     log('profile.complete', { summary: TRP.profile.summary(ctx), flags: flags }, r);
   }
@@ -677,7 +709,7 @@
           else if (b.type === 'actions') {
             var row = el('div', { class: 'btn-row' });
             b.actions.forEach(function (a) {
-              row.appendChild(el('button', { type: 'button', class: 'btn btn-outline', onclick: a.run }, a.label));
+              row.appendChild(el('button', { type: 'button', class: 'btn btn-outline', onclick: function () { runAction(a); } }, a.label));
             });
             node.appendChild(row);
           }
@@ -955,7 +987,7 @@
       blocks.push({ type: 'p', text: "I couldn't read " + (manual.length === 1 ? 'this one' : 'these') + '. You can enter the values by hand:' });
       blocks.push({ type: 'ul', items: manual.map(function (d) { return d.name + ': ' + d.reason + '.'; }) });
       blocks.push({ type: 'actions', actions: manual.map(function (d) {
-        return { label: 'Enter values for ' + d.name, run: function () { openManual(d.id); } };
+        return { label: 'Enter values for ' + d.name, act: 'manual', arg: d.id };
       }) });
     }
 
@@ -1186,7 +1218,7 @@
       assumptions: r.result.assumptions, escalated: escalations(r, g), checks: r.result.checks
     }, r);
     say(r, [{ type: 'p', text: 'The return is calculated: taxable income ' + TRP.extract.formatMoney(F['23']) + ', total tax ' + TRP.extract.formatMoney(F['24']) + '. It is a draft for professional review.' },
-      { type: 'actions', actions: [{ label: 'Open the result and downloads', run: function () { setView('complete'); } }] }]);
+      { type: 'actions', actions: [{ label: 'Open the result and downloads', act: 'complete' }] }]);
     setView('complete');
     renderAll();
   }
@@ -1576,7 +1608,7 @@
     }
 
     var rect = item.parser ? item.parser.rect : null;
-    var note = !doc.pdf ? (item.manual ? '' : 'There is no page to show for this document.')
+    var note = !doc.pdf ? (item.manual ? '' : doc.leftOut ? 'This document was left out of the saved file, so its page cannot be shown. The values read from it are kept.' : 'There is no page to show for this document.')
       : rect ? '' : 'No highlight is available for this value, because it was not located in the text layer.';
     if (note) body.appendChild(el('p', { class: 'fine' }, note));
     if (doc.pdf) drawPage(doc, pageNum, rect, body);
@@ -1899,6 +1931,196 @@
     say(r, blocks);
   }
 
+  /* ---------- Save progress to a file, and open it again ---------- */
+
+  var SAVE_FORMAT = 'trust-return-preparer-progress';
+
+  function toBase64(bytes) {
+    var out = '', chunk = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunk) out += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(out);
+  }
+  function fromBase64(s) {
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  /** A plain copy of the conversation. Live parts (question rules, button actions, half-typed entries) are left out and rebuilt on opening. */
+  function plainMessages(r) {
+    return r.messages.map(function (m) {
+      if (m.role === 'user') return { id: m.id, role: 'user', text: m.text, files: m.files };
+      return { id: m.id, role: 'assistant', blocks: (m.blocks || []).filter(function (b) { return b.type !== 'status'; }).map(function (b) {
+        if (b.type === 'question') {
+          var q = b.q, copy = {};
+          Object.keys(q).forEach(function (k) { if (['def', 'draft', 'error', 'showSource'].indexOf(k) === -1) copy[k] = q[k]; });
+          return { type: 'question', q: copy };
+        }
+        if (b.type === 'actions') return { type: 'actions', actions: b.actions.map(function (a) { return { label: a.label, act: a.act, arg: a.arg }; }) };
+        return b;
+      }) };
+    });
+  }
+
+  async function buildSave(r, opts) {
+    var docs = [];
+    for (var i = 0; i < r.docs.length; i++) {
+      var d = r.docs[i], data = null;
+      if (opts.documents && d.file) data = toBase64(new Uint8Array(await d.file.arrayBuffer()));
+      docs.push({ id: d.id, name: d.name, size: d.size, status: d.status, reason: d.reason, typeLabel: d.typeLabel, forms: d.forms,
+        type: d.file ? d.file.type || 'application/pdf' : null, hadFile: !!d.file, data: data });
+    }
+    var fields = ['name', 'named', 'step', 'items', 'docSeq', 'itemSeq', 'acked', 'answers', 'profileStarted', 'profileDone', 'openQuestions',
+      'flagState', 'result', 'signoff', 'log', 'status', 'blocked', 'awaitingChange', 'stopShown'];
+    var ret = {};
+    fields.forEach(function (k) { if (r[k] !== undefined) ret[k] = r[k]; });
+    ret.messages = plainMessages(r);
+    ret.docs = docs;
+    ret.pii = opts.numbers ? r.pii : {};
+    return {
+      format: SAVE_FORMAT, version: 1, taxYear: TRP.profile.YEAR, savedAt: new Date().toISOString(),
+      notice: 'Trust Return Preparer progress file. Synthetic data only. ' +
+        (opts.numbers ? 'This file CONTAINS full SSNs and EINs.' : 'Full SSNs and EINs were removed.') +
+        (opts.documents ? ' It contains the uploaded documents.' : ' Uploaded documents were left out.'),
+      includes: { identifyingNumbers: !!opts.numbers, documents: !!opts.documents },
+      'return': ret
+    };
+  }
+
+  function openSaveDialog() {
+    var r = active();
+    if (!r) return;
+    var dlg = $('#save-dialog');
+    $('#save-error').textContent = r.busy ? 'Wait for the documents to finish reading, then save.' : '';
+    $('#save-confirm').disabled = !!r.busy;
+    $$('input[name="save-numbers"]').forEach(function (x) { x.checked = x.value === 'remove'; });
+    $('#save-docs').checked = false;
+    updateSaveWarning();
+    var hasNumbers = !!(r.pii.ein || (r.pii.beneficiaries && r.pii.beneficiaries.length));
+    $('#save-numbers-set').hidden = !hasNumbers;
+    $('#save-docs-row').hidden = !r.docs.some(function (d) { return d.file; });
+    dlg.showModal();
+  }
+
+  function updateSaveWarning() {
+    var keep = $('input[name="save-numbers"][value="keep"]').checked && !$('#save-numbers-set').hidden;
+    var docs = $('#save-docs').checked && !$('#save-docs-row').hidden;
+    var parts = [];
+    if (keep) parts.push('full SSNs and EINs');
+    if (docs) parts.push('the uploaded documents, which can show identifying numbers and account details');
+    var w = $('#save-warning');
+    w.hidden = !parts.length;
+    w.textContent = parts.length ? 'This file will contain ' + parts.join(' and ') + '. Anyone who opens it can read them. Keep it somewhere private, delete it when you no longer need it, and use synthetic data only.' : '';
+  }
+
+  async function saveProgress() {
+    var r = active();
+    if (!r || r.busy) return;
+    var btn = $('#save-confirm');
+    var opts = { numbers: $('input[name="save-numbers"][value="keep"]').checked && !$('#save-numbers-set').hidden,
+      documents: $('#save-docs').checked && !$('#save-docs-row').hidden };
+    btn.disabled = true;
+    try {
+      log('progress.saved', { identifyingNumbers: opts.numbers ? 'kept' : 'removed', documents: opts.documents ? 'included' : 'left out' }, r);
+      var data = await buildSave(r, opts);
+      var stamp = new Date().toISOString().slice(0, 10);
+      var name = 'Trust_return_progress_' + r.name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') + '_' + stamp + (opts.numbers ? '_CONTAINS_SSN_EIN' : '') + '.json';
+      saveBytes(new TextEncoder().encode(JSON.stringify(data)), name, 'application/json');
+      r.dirty = false;
+      $('#save-dialog').close();
+      renderAll();
+    } catch (err) {
+      $('#save-error').textContent = 'The file could not be saved: ' + (err && err.message ? err.message : err) + '.';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function seqOf(id) { var m = /^[a-z](\d+)$/.exec(String(id || '')); return m ? parseInt(m[1], 10) : 0; }
+
+  /** Opens a progress file as a new return in this tab. */
+  async function openProgress(file) {
+    var msg = $('#load-msg');
+    msg.textContent = 'Opening ' + file.name + '…';
+    var data;
+    try {
+      data = JSON.parse(await file.text());
+      if (!data || data.format !== SAVE_FORMAT || !data['return'] || !Array.isArray(data['return'].messages)) throw new Error('not a progress file');
+      if (data.taxYear !== TRP.profile.YEAR) throw new Error('it is for tax year ' + data.taxYear);
+    } catch (err) {
+      msg.textContent = "That file couldn't be opened: " + (err.message === 'not a progress file' || err instanceof SyntaxError ? 'it is not a Trust Return Preparer progress file' : err.message) + '.';
+      setView('first-run');
+      return;
+    }
+    var saved = data['return'], n = ++state.seq;
+    var r = {
+      id: 'r' + n, name: 'Untitled trust return ' + n, step: 'documents', messages: [], files: [], docs: [], items: [], docSeq: 0, itemSeq: 0,
+      acked: false, busy: false, answers: {}, pii: {}, profileStarted: false, profileDone: false, openQuestions: [], flagState: {},
+      result: null, escalated: 0, counts: { high: 0, medium: 0, low: 0 }, log: [], status: '', dirty: false, blocked: false
+    };
+    Object.keys(saved).forEach(function (k) { if (k !== 'messages' && k !== 'docs' && k !== 'pii' && k in r || k === 'named' || k === 'signoff' || k === 'awaitingChange' || k === 'stopShown') r[k] = saved[k]; });
+    r.pii = saved.pii && typeof saved.pii === 'object' ? saved.pii : {};
+    r.busy = false; r.outputs = null;
+
+    // Conversation: give question cards their rules back, and buttons their actions.
+    var maxSeq = 0;
+    r.messages = saved.messages.map(function (m) {
+      maxSeq = Math.max(maxSeq, seqOf(m.id));
+      (m.blocks || []).forEach(function (b) {
+        if (b.type === 'question') {
+          maxSeq = Math.max(maxSeq, seqOf(b.q.id));
+          b.q.draft = {}; b.q.error = '';
+          if (b.q.pid) {
+            b.q.def = TRP.profile.byId[b.q.pid];
+            if (!b.q.def) b.q.superseded = true;
+          }
+        }
+      });
+      return m;
+    });
+    state.msgSeq = Math.max(state.msgSeq, maxSeq);
+
+    // Documents: reopen any that were included, so their pages can be shown again.
+    for (var i = 0; i < (saved.docs || []).length; i++) {
+      var d = saved.docs[i], doc = { id: d.id, name: d.name, size: d.size, status: d.status, reason: d.reason, typeLabel: d.typeLabel,
+        forms: d.forms || [], file: null, pdf: null, pages: [], leftOut: !!d.hadFile && !d.data };
+      if (d.data) {
+        try {
+          doc.file = new File([fromBase64(d.data)], d.name, { type: d.type || 'application/pdf' });
+          var opened = await TRP.extract.openPdf(doc.file);
+          doc.pdf = opened.pdf; doc.pages = opened.pages;
+          r.files.push(doc.file);
+        } catch (err) { doc.leftOut = true; }
+      }
+      r.docs.push(doc);
+    }
+
+    // Without the identifying numbers, the return cannot be generated until they are typed in again.
+    var numbersMissing = (r.answers.ein && !r.pii.ein) || (r.answers.beneficiaries && !(r.pii.beneficiaries && r.pii.beneficiaries.length));
+    state.returns.unshift(r);
+    state.activeId = r.id;
+    state.pending = [];
+    state.panel = null;
+    log('progress.loaded', { file: file.name, savedAt: data.savedAt, identifyingNumbers: data.includes && data.includes.identifyingNumbers ? 'included' : 'removed',
+      documents: data.includes && data.includes.documents ? 'included' : 'left out' }, r);
+    var note = ['Opened the saved return "' + r.name + '" from ' + new Date(data.savedAt).toLocaleString() + '.'];
+    if (r.docs.some(function (d) { return d.leftOut; })) note.push('The uploaded documents were left out of the file. Every value read from them is kept, but their pages cannot be shown.');
+    if (numbersMissing) {
+      delete r.answers.reenter_ids;
+      if (r.result) invalidate(r);
+      r.profileDone = false;
+      note.push('The identifying numbers were removed when it was saved, so I will ask for them again before the return can be generated.');
+    } else if (data.includes && data.includes.identifyingNumbers) {
+      note.push('This file contained full SSNs and EINs. If you no longer need it, delete it from your computer.');
+    }
+    say(r, note.join(' '));
+    msg.textContent = '';
+    recount(r);
+    if (r.profileStarted) askNext(r);
+    setView(r.result ? 'complete' : 'chat');
+    renderAll();
+  }
+
   /* ---------- Sidebar, progress panel, log ---------- */
 
   function stepLabel(id) {
@@ -1994,6 +2216,7 @@
     $('#topbar-status').textContent = r ? (r.blocked ? 'Closed' : r.status) : '';
     $('#topbar-title').textContent = inReturn && r ? r.name : 'Trust Return Preparer';
     $('#rename-btn').hidden = !inReturn || !!$('.rename-form');
+    $('#save-btn').hidden = !inReturn;
     renderSidebar();
     renderPanel();
   }
@@ -2203,6 +2426,18 @@
     });
     $('#review-btn').addEventListener('click', function () { closeDrawers(); setView('review'); });
     $('#rename-btn').addEventListener('click', startRename);
+    $('#save-btn').addEventListener('click', openSaveDialog);
+    $('#save-confirm').addEventListener('click', saveProgress);
+    $$('input[name="save-numbers"]').forEach(function (x) { x.addEventListener('change', updateSaveWarning); });
+    $('#save-docs').addEventListener('change', updateSaveWarning);
+    function pickProgress() { $('#load-input').click(); }
+    $('#load-btn').addEventListener('click', function () { closeDrawers(); pickProgress(); });
+    $('#first-load-btn').addEventListener('click', pickProgress);
+    $('#load-input').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      e.target.value = '';
+      if (f) openProgress(f);
+    });
     $('#generate-btn').addEventListener('click', function () { var r = active(); if (r) generate(r); });
     $('#manual-btn').addEventListener('click', function () { closeDrawers(); openManual(null); });
     $('#source-close').addEventListener('click', closePanel);
